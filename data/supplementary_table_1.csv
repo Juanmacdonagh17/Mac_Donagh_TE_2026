@@ -1,0 +1,8 @@
+panel,category,n,pct
+genes,With TE,18447,92.198
+genes,Without TE,1561,7.802
+exon_intron,Exons with TE,NA,0.81
+exon_intron,Introns with TE,NA,99.19
+exon_detail,3'UTR,92104,61.220000000000006
+exon_detail,5'UTR,42963,28.56
+exon_detail,CDS,15355,10.22
