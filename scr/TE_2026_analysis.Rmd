@@ -1,0 +1,1582 @@
+---
+title: "TE_2026_analysis — paper-ready figures"
+output: html_document
+---
+
+```{r setup}
+packages <- c("purrr", "readr", "dplyr", "tidyr", "ggpubr", "gprofiler2", "ggplot2",
+              "patchwork", "paletteer", "tictoc", "furrr", "slider", "stringr", "scales",
+              "ggridges", "forcats", "tidytext", "rstatix", "clinfun", "ggdist", "readxl",
+              "pROC", "boot", "svglite")
+
+to_install <- packages[!packages %in% installed.packages()[, "Package"]]
+if (length(to_install)) install.packages(to_install)
+
+library(purrr)
+purrr::walk(packages, library, character.only = TRUE, quietly = TRUE, warn.conflicts = FALSE)
+
+plan(multisession, workers = 30)
+```
+
+```{r palettes}
+ordered_colors    <- c("#44749A", "#98C9EA")
+disordered_colors <- c("#DA3948", "#D2AEB9")
+
+te_general_color    <- scales::alpha("#684484", 0.8)
+non_te_region       <- scales::alpha("#4C8C6B", 0.8)
+isoform_no_te_color <- scales::alpha("#7A8F2A", 0.8)
+no_te_color         <- scales::alpha("#3E474A", 0.8)
+
+custom_palette  <- c(ordered_colors, disordered_colors)
+custom_palette2 <- c(te_general_color, isoform_no_te_color, no_te_color)
+```
+
+```{r save-helper}
+# DRY figure saver. PNG always; SVG only when svg = TRUE (skip for heavy
+# halfeye / density / dot panels whose vector output is enormous).
+# `name` is the file stem (e.g. "fig_1a", "edf_2d"); `section` is the subfolder.
+save_fig <- function(plot, name, section, svg = TRUE,
+                     width = 10, height = 7, dpi = 320) {
+  dir <- file.path("../plots", section)
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  ggsave(file.path(dir, paste0(name, ".png")), plot = plot,
+         width = width, height = height, units = "in", dpi = dpi,
+         device = "png", bg = "white")
+  if (svg) {
+    ggsave(file.path(dir, paste0(name, ".svg")), plot = plot,
+           width = width, height = height, units = "in",
+           device = "svg", bg = "white")
+  }
+  invisible(plot)
+}
+```
+
+# ============================================================
+# SECTION 1 — Figure 1 + Extended Data Figure 1
+# ============================================================
+
+```{r load-df1}
+df1 <- read.csv("../data/supplementary_table_1.csv")
+```
+
+```{r fig_1a}
+#### Fig 1a — % genes with/without TE ####
+df_genes <- df1 %>%
+  filter(panel == "genes") %>%
+  mutate(category = factor(category, levels = category)) %>%
+  dplyr::select(category, n, pct)
+
+genes_palette <- c("With TE" = "#674ea7", "Without TE" = "#808080")
+
+p_1a <- ggplot(
+  df_genes |> mutate(category_2 = factor(category,
+    levels = c("With TE", "Without TE"),
+    labels = c("Genes\nwith TE", "Genes\nwithout TE"))),
+  aes(x = category_2, y = pct, color = category, fill = category)) +
+  geom_bar(stat = "identity", linewidth = 1.8, width = 0.5) +
+  geom_text(aes(label = sprintf("%.2f%%", pct)), vjust = -0.3, size = 10, color = "black") +
+  scale_color_manual(values = genes_palette) +
+  scale_fill_manual(values = genes_palette) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100),
+                     breaks = c(0, 25, 50, 75, 100), labels = scales::percent_format(scale = 1)) +
+  coord_cartesian(clip = "off") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20), legend.position = "none") +
+  labs(title = "", x = "", y = "Percentage (%)")
+p_1a
+save_fig(p_1a, "fig_1a", "section1")
+```
+
+```{r fig_1b}
+#### Fig 1b — exon vs intron TE content ####
+main_type_summary_2 <- df1 %>%
+  filter(panel == "exon_intron") %>%
+  transmute(type_2 = factor(category, levels = c("Exons with TE", "Introns with TE")), pct_2 = pct)
+
+exon_intron_palette <- c("Exons with TE" = "#674ea7", "Introns with TE" = "#D38DDB")
+
+p_1b <- ggplot(main_type_summary_2, aes(x = type_2, y = pct_2, color = type_2, fill = type_2)) +
+  geom_bar(stat = "identity", linewidth = 1.8, width = 0.5) +
+  scale_color_manual(values = exon_intron_palette) +
+  scale_fill_manual(values = exon_intron_palette) +
+  geom_text(aes(label = sprintf("%.2f%%", pct_2)), vjust = -0.3, size = 10, color = "black") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100),
+                     labels = scales::percent_format(scale = 1)) +
+  coord_cartesian(clip = "off") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20), legend.position = "none") +
+  labs(title = "", x = "", y = "Percentage (%)")
+p_1b
+save_fig(p_1b, "fig_1b", "section1")
+```
+
+```{r fig_1c}
+#### Fig 1c — transcript-region distribution (5'UTR / CDS / 3'UTR) ####
+exon_detail_summary_2 <- df1 %>%
+  filter(panel == "exon_detail") %>%
+  mutate(exon_detail = factor(category, levels = category)) %>%
+  dplyr::select(exon_detail, n, pct) %>%
+  mutate(exon_detail = fct_recode(exon_detail, "5'UTR" = "UTR5", "3'UTR" = "UTR3") %>%
+           fct_relevel("5'UTR", "CDS", "3'UTR"))
+
+p_1c <- ggplot(exon_detail_summary_2, aes(x = exon_detail, y = pct, color = exon_detail, fill = exon_detail)) +
+  geom_bar(stat = "identity", linewidth = 1.6, width = 0.6) +
+  geom_text(aes(label = paste0(round(pct, 2), "%")), vjust = -0.3, size = 10, color = "black") +
+  scale_color_manual(values = c("5'UTR" = "#4A90D9", "CDS" = "#674ea7", "3'UTR" = "#E06C3A")) +
+  scale_fill_manual(values = c("5'UTR" = "#4A90D9", "CDS" = "#674ea7", "3'UTR" = "#E06C3A")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100),
+                     labels = scales::percent_format(scale = 1)) +
+  coord_cartesian(clip = "off") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20), legend.position = "none") +
+  labs(title = "", x = "", y = "Percentage (%)")
+p_1c
+save_fig(p_1c, "fig_1c", "section1")
+```
+
+```{r load-df2}
+df2 <- read.csv("../data/supplementary_table_2.csv")
+```
+
+```{r edf_1a}
+#### ED Fig 1a — e-value distribution per search method ####
+plot1 <- df2 %>%
+  dplyr::select(e_value, source) %>% distinct() %>%
+  mutate(source = recode(source, "api" = "RepeatMasker", "alignment" = "HMM retrieved"))
+
+p_edf1a <- ggplot(plot1, aes(x = e_value, fill = source)) +
+  geom_histogram(bins = 50, alpha = 0.7) +
+  scale_x_log10() +
+  scale_fill_manual(values = c("RepeatMasker" = "#9DD1E9", "HMM retrieved" = "#DA3948")) +
+  coord_cartesian(xlim = c(NA, 0.1)) +
+  geom_vline(xintercept = 1e-2, linetype = "dashed", color = "red") +
+  labs(x = "e-value (log10 scale)", y = "Number") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 10), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        legend.position = c(0.0101, 1), legend.justification = c("left", "top"),
+        legend.title = element_text(size = 0), legend.text = element_text(size = 20))
+p_edf1a
+save_fig(p_edf1a, "edf_1a", "section1")
+```
+
+```{r load-df3}
+df3 <- read.csv("../data/supplementary_table_3.csv")
+```
+
+```{r fig_1d}
+#### Fig 1d — unique genes / transcripts / insertions ####
+stage_lvls <- c("Genes", "Transcripts", "Insertions")
+plot2 <- tibble::tibble(
+  stage = factor(stage_lvls, levels = stage_lvls),
+  count = c(df3 %>% distinct(ensembl_gene_id_version) %>% nrow(),
+            df3 %>% distinct(target_name) %>% nrow(),
+            df3 %>% dplyr::select(uniprot_id, dfam_id, start_aa, end_aa) %>% distinct() %>% nrow()))
+
+p_1d <- ggplot() +
+  geom_col(data = plot2, aes(stage, count), fill = "#327e45", width = 0.7) +
+  geom_text(data = plot2, aes(stage, count, label = count), vjust = -0.3, size = 14) +
+  labs(x = NULL, y = "Number", fill = NULL, title = "") +
+  coord_cartesian(ylim = c(NA, 7500), clip = "off") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20))
+p_1d
+save_fig(p_1d, "fig_1d", "section1")
+```
+
+```{r edf_1b}
+#### ED Fig 1b — TE insertions per protein ####
+plot2_df <- df3 %>%
+  dplyr::select(uniprot_id, dfam_id) %>% distinct() %>%
+  count(uniprot_id, name = "n_dfam")
+mean(plot2_df$n_dfam)
+
+p_edf1b <- ggplot(plot2_df, aes(x = n_dfam)) +
+  geom_histogram(aes(y = after_stat(count / sum(count)) * 100),
+                 binwidth = 1, boundary = -0.5, fill = te_general_color, closed = "left") +
+  scale_x_continuous(breaks = function(x) seq(floor(min(x)), ceiling(max(x)), by = 1)) +
+  labs(x = "Number of TE insertions per protein", y = "Percentage (%)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20))
+p_edf1b
+save_fig(p_edf1b, "edf_1b", "section1")
+```
+
+```{r fig_1e}
+#### Fig 1e — canonical proteins vs isoforms ####
+canons   <- df3 %>% dplyr::select(uniprot_id) %>% distinct() %>% filter(!grepl("-", uniprot_id)) %>% nrow()
+isoforms <- df3 %>% dplyr::select(uniprot_id) %>% distinct() %>% filter(grepl("-", uniprot_id)) %>% nrow()
+
+plot5_df <- data.frame(
+  stage = factor(c("Canonical proteins", "Isoforms"), levels = c("Canonical proteins", "Isoforms")),
+  count = c(canons, isoforms))
+
+p_1e <- ggplot(plot5_df, aes(x = stage, y = count, fill = stage)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = count, y = count), vjust = -0.4, size = 14, show.legend = FALSE) +
+  scale_fill_manual(values = c("Canonical proteins" = "#A68BC2", "Isoforms" = "#5C9E9E")) +
+  scale_y_continuous(expand = expansion(mult = c(0.02, 0.10))) +
+  labs(x = NULL, y = "Number", title = "") +
+  coord_cartesian(ylim = c(NA, 5500), clip = "off") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
+        axis.title.y = element_text(size = 20), legend.position = "none")
+p_1e
+save_fig(p_1e, "fig_1e", "section1")
+```
+
+```{r edf_1c}
+#### ED Fig 1c — TE insertion length (aa) ####
+plot3_df <- df3 %>%
+  dplyr::select(uniprot_id, end_aa, start_aa) %>% distinct() %>%
+  mutate(length_te = end_aa - start_aa)
+mean(plot3_df$length_te, na.rm = TRUE)
+
+p_edf1c <- ggplot(plot3_df, aes(x = length_te)) +
+  geom_histogram(bins = 50, fill = te_general_color, alpha = 0.8) +
+  coord_cartesian(xlim = c(NA, 400)) +
+  labs(x = "TE insertion length (aa)", y = "Number") +
+  theme_classic() +
+  theme(axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+p_edf1c
+save_fig(p_edf1c, "edf_1c", "section1")
+```
+
+```{r edf_1d}
+#### ED Fig 1d — number of exons per TE insertion ####
+p_edf1d <- ggplot(df3, aes(x = n_exons)) +
+  geom_histogram(aes(y = after_stat(count / sum(count)) * 100), binwidth = 1, fill = te_general_color) +
+  scale_x_continuous(breaks = function(x) seq(floor(min(x, na.rm = TRUE)),
+                                              ceiling(max(x, na.rm = TRUE)), by = 1)) +
+  labs(title = "", x = "Number of exons per TE insertion", y = "Percentage (%)") +
+  coord_cartesian(xlim = c(NA, 12)) +
+  theme_classic() +
+  theme(axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+p_edf1d
+save_fig(p_edf1d, "edf_1d", "section1")
+```
+
+```{r fig_1f}
+#### Fig 1f — repeat-type composition ####
+df_rep <- dplyr::bind_rows(
+  df3 %>% dplyr::count(repeat_type_name, name = "n") %>% dplyr::mutate(status = "Filtered"))
+rep_levels <- df_rep %>% dplyr::arrange(n) %>% dplyr::pull(repeat_type_name)
+df_rep <- df_rep %>% dplyr::mutate(repeat_type_name = factor(repeat_type_name, levels = rep_levels))
+df_rep_pct <- df_rep %>% mutate(pct = 100 * n / sum(n))
+
+p_1f <- ggplot(df_rep_pct, aes(x = pct, y = repeat_type_name, fill = repeat_type_name)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.7) +
+  geom_text(aes(label = paste0(round(pct, 2), "%")), position = position_dodge(width = 0.75),
+            hjust = -0.2, size = 8) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A",
+                               "SINE" = "#3D6446", "LTR" = "#4A6A8A", "PLE" = "#8A6A2A",
+                               "RC" = "#2A4A6A", "RNA" = "#6A8A4A", "Satellite" = "#8A4A6A",
+                               "snRNA" = "#4A8A8A")) +
+  labs(x = "Percentage", y = NULL, title = "") +
+  coord_cartesian(xlim = c(NA, 35)) +
+  theme_classic() +
+  theme(axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 16),
+        axis.text.y = element_text(size = 18), legend.title = element_blank(),
+        legend.text = element_text(size = 12), legend.position = "none")
+p_1f
+save_fig(p_1f, "fig_1f", "section1")
+```
+
+# ============================================================
+# SECTION 2 — Figure 2 + Extended Data Figures 2, 3, 5
+# ============================================================
+
+```{r load-df4-df5}
+df4 <- read.csv("../data/supplementary_table_4.csv")
+df5 <- read.csv("../data/supplementary_table_5.csv")
+```
+
+
+```{r fig_2a}
+#### Fig 2a — ROC of disorder predictors ####
+df_roc_D <- df5 %>%
+  dplyr::select(flag, aiupred, spot_P_D, pLDDT, af_rsa, punch) %>%
+  filter(!is.na(aiupred), !is.na(spot_P_D), !is.na(af_rsa), !is.na(punch))
+
+roc_af_rsa  <- pROC::roc(response = df_roc_D$flag, predictor = df_roc_D$af_rsa)
+roc_plddt   <- pROC::roc(response = df_roc_D$flag, predictor = df_roc_D$pLDDT)
+roc_spot    <- pROC::roc(response = df_roc_D$flag, predictor = df_roc_D$spot_P_D)
+roc_aiupred <- pROC::roc(response = df_roc_D$flag, predictor = df_roc_D$aiupred)
+roc_punch   <- pROC::roc(response = df_roc_D$flag, predictor = df_roc_D$punch)
+
+roc_list <- list("AF - RSA" = roc_af_rsa, "1 - pLDDT" = roc_plddt, "spotds" = roc_spot,
+                 "AIUPred" = roc_aiupred, "PUNCH 2-light" = roc_punch)
+labels <- c(
+  "AF - RSA"      = paste0("pLDDT-RSA (25) (AUC = ", round(pROC::auc(roc_af_rsa), 3), ")"),
+  "1 - pLDDT"     = paste0("1-pLDDT (AUC = ", round(pROC::auc(roc_plddt), 3), ")"),
+  "spotds"        = paste0("spotds (AUC = ", round(pROC::auc(roc_spot), 3), ")"),
+  "AIUPred"       = paste0("AIUPred (AUC = ", round(pROC::auc(roc_aiupred), 3), ")"),
+  "PUNCH 2-light" = paste0("PUNCH 2-light (AUC = ", round(pROC::auc(roc_punch), 3), ")"))
+
+p_2a <- pROC::ggroc(roc_list, legacy.axes = TRUE) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  scale_color_manual(values = c("AF - RSA" = "#E84C4C", "1 - pLDDT" = "#4C6FE8",
+                                "spotds" = "#6CFFE8", "AIUPred" = "#A74F8C",
+                                "PUNCH 2-light" = "#A97369"),
+                     labels = labels, name = NULL) +
+  labs(x = "1 - Specificity", y = "Sensitivity", title = "") +
+  theme_minimal()
+p_2a
+save_fig(p_2a, "fig_2a", "section2")
+```
+
+```{r load-df6}
+df6 <- read.csv("../data/supplementary_table_6.csv")
+lvls <- c("Proteins (with TEs)", "Isoforms (no TEs)", "Canonical (no TEs)")
+fill_vals <- c("Proteins (with TEs)" = custom_palette2[1],
+               "Isoforms (no TEs)"   = custom_palette2[2],
+               "Canonical (no TEs)"  = scales::alpha("#C76334", 0.8))
+```
+
+```{r fig_2b}
+#### Fig 2b — mean disorder (1-pLDDT) across protein groups ####
+# Heavy panel (halfeye + dots): PNG only.
+df_1_plddt <- df6 %>% filter(data_af == "yes") %>% ungroup() %>%
+  mutate(type = factor(type, levels = lvls))
+cmp2b <- combn(levels(df_1_plddt$type), 2, simplify = FALSE)
+
+p_2b <- ggplot(df_1_plddt, aes(x = type, y = mean_disorder, fill = type, color = type)) +
+  ggdist::stat_halfeye(side = "left", adjust = 0.8, width = 0.6, justification = 1.1, slab_alpha = 0.6) +
+  ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.10, size = 0.9, width = 0.4) +
+  scale_fill_manual(values = fill_vals) + scale_color_manual(values = fill_vals) +
+  stat_compare_means(comparisons = cmp2b, method = "wilcox.test", label = "p.signif",
+                     hide.ns = TRUE, p.adjust = "BH", method.args = list(exact = FALSE)) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5),
+        axis.title.y = element_text(size = 20),
+        legend.position = "none") +
+  labs(x = NULL, y = "Mean protein disorder (1 - pLDDT)", title = "")
+p_2b
+save_fig(p_2b, "fig_2b", "section2", svg = FALSE)  # heavy
+
+df_1_plddt <- df_1_plddt %>% ungroup()
+stat_2b <- df_1_plddt %>%
+  wilcox_test(mean_disorder ~ type, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_1_plddt %>% wilcox_effsize(mean_disorder ~ type) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "2b", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "proteins", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_2b
+```
+
+```{r mm_2b}
+mm_2b <- df_1_plddt %>% group_by(type) %>%
+  summarise(mean = mean(mean_disorder), median = median(mean_disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "2b", group = as.character(type), predictor = "AF 1-pLDDT", mean, median, n)
+mm_2b
+```
+
+```{r edf_2a}
+#### ED Fig 2a — mean disorder (AF-RSA) across protein groups ####
+df_rsa <- df6 %>% filter(data_af == "yes") %>% mutate(type = factor(type, levels = lvls))
+cmp_rsa <- combn(levels(df_rsa$type), 2, simplify = FALSE)
+
+p_edf2a <- ggplot(df_rsa, aes(x = type, y = mean_disorder25, fill = type)) +
+  geom_boxplot() + scale_fill_manual(values = fill_vals) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5),
+        axis.title.y = element_text(size = 20),
+        legend.position = "none") +
+    
+  labs(x = NULL, y = "Mean protein disorder (AF - RSA)", title = "") +
+  stat_compare_means(comparisons = cmp_rsa, method = "wilcox.test", label = "p.signif",
+                     hide.ns = TRUE, p.adjust = "BH", method.args = list(exact = FALSE))
+p_edf2a
+save_fig(p_edf2a, "edf_2a", "section2")
+
+df_rsa <- df_rsa %>% ungroup()
+stat_rsa <- df_rsa %>%
+  wilcox_test(mean_disorder25 ~ type, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_rsa %>% wilcox_effsize(mean_disorder25 ~ type) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED2a", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "proteins", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF-RSA")
+stat_rsa
+
+mm_rsa <- df_rsa %>% group_by(type) %>%
+  summarise(mean = mean(mean_disorder25), median = median(mean_disorder25), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED2a", group = as.character(type), predictor = "AF-RSA", mean, median, n)
+mm_rsa
+```
+
+```{r edf_2b}
+#### ED Fig 2b — mean disorder (PUNCH) across protein groups ####
+df_punch <- df6 %>% filter(data_punch == "yes") %>% mutate(type = factor(type, levels = lvls))
+cmp_punch <- combn(levels(df_punch$type), 2, simplify = FALSE)
+
+p_edf2b <- ggplot(df_punch, aes(x = type, y = mean_punch, fill = type)) +
+  geom_boxplot() + scale_fill_manual(values = fill_vals) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5),
+        axis.title.y = element_text(size = 20),
+        legend.position = "none") +
+  labs(x = NULL, y = "Mean protein disorder (PUNCH 2-light)", title = "") +
+  stat_compare_means(comparisons = cmp_punch, method = "wilcox.test", label = "p.signif",
+                     hide.ns = TRUE, p.adjust = "BH", method.args = list(exact = FALSE))
+p_edf2b
+save_fig(p_edf2b, "edf_2b", "section2")
+
+df_punch <- df_punch %>% ungroup()
+stat_punch <- df_punch %>%
+  wilcox_test(mean_punch ~ type, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_punch %>% wilcox_effsize(mean_punch ~ type) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED2b", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "proteins", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "PUNCH 2-light")
+stat_punch
+
+mm_punch <- df_punch %>% group_by(type) %>%
+  summarise(mean = mean(mean_punch), median = median(mean_punch), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED2b", group = as.character(type), predictor = "PUNCH 2-light", mean, median, n)
+mm_punch
+```
+
+```{r fig_2c}
+#### Fig 2c — disorder category composition ####
+df_bin <- df6 %>%
+  filter(data_af == "yes") %>%
+  mutate(type = factor(type, levels = lvls),
+         type_disorder = case_when(
+           is.na(mean_disorder)  ~ NA_character_,
+           mean_disorder <= 0.10 ~ "Highly ordered",
+           mean_disorder < 0.321 ~ "Ordered",
+           mean_disorder < 0.5   ~ "Highly disordered",
+           mean_disorder >= 0.5  ~ "IDP"),
+         type_disorder = factor(type_disorder,
+           levels = c("Highly ordered", "Ordered", "Highly disordered", "IDP"), ordered = TRUE))
+
+counts_lab <- df_bin %>%
+  filter(!is.na(type), !is.na(type_disorder)) %>%
+  count(type, type_disorder, name = "n") %>%
+  group_by(type) %>% mutate(frac = n / sum(n)) %>% ungroup()
+
+p_2c <- ggplot(counts_lab, aes(x = type, y = n, fill = type_disorder)) +
+  geom_col(position = "fill", color = "black") +
+  geom_text(aes(label = scales::percent(frac, accuracy = 1)),
+            position = position_fill(vjust = 0.5), size = 4, color = "white") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = NULL, y = "Percentage (%)", fill = "Category:", title = "") +
+  scale_fill_manual(values = c("Highly ordered" = custom_palette[1], "Ordered" = custom_palette[2],
+                               "Highly disordered" = custom_palette[4], "IDP" = custom_palette[3])) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5), axis.title.y = element_text(size = 20), legend.position = "top")
+p_2c
+save_fig(p_2c, "fig_2c", "section2")
+```
+
+```{r edf_2c}
+#### ED Fig 2c — % of IDPs across groups ####
+
+plot_df <- df6 %>%
+  filter(data_af == "yes", mean_disorder >= 0.5) %>%
+  mutate(type = factor(type, levels = lvls)) %>%
+  count(type, name = "n") %>% mutate(pct = 100 * n / sum(n))
+
+p_edf2c <- ggplot(plot_df, aes(x = "", y = pct, fill = type)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = round(pct, 2)), position = position_stack(vjust = 0.5), size = 5, color = "black") +
+  geom_text(aes(label = type, x = 1.6), position = position_stack(vjust = 0.5), size = 5, color = "black") +
+  scale_fill_manual(values = fill_vals) +
+  labs(y = "% of IDPs (1 - pLDDT)", x = "", title = "") +
+  theme_classic() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        axis.title.y = element_text(size = 20), legend.position = "none") +
+  coord_cartesian(xlim = c(0.7, 1.45), clip = "off")
+p_edf2c
+save_fig(p_edf2c, "edf_2c", "section2")
+```
+
+```{r load-df7}
+df7 <- read.csv("../data/supplementary_table_7.csv") %>%
+  mutate(tr = factor(tr, levels = c("no_TR_region", "TR_region")))
+```
+
+```{r fig_2d}
+#### Fig 2d — position-level disorder TE vs non-TE (1-pLDDT) ####
+# Heavy panel (halfeye + dots on millions of positions): PNG only.
+p_2d <- ggplot(df7, aes(x = tr, y = X1_plddt, fill = tr)) +
+  ggdist::stat_halfeye(side = "left", adjust = 0.8, width = 0.6, justification = 1.1, slab_alpha = 0.9) +
+  ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.5, size = 0.2, width = 0.4, quantiles = 1000) +
+  scale_fill_manual(values = c(non_te_region, te_general_color)) +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "") +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  scale_x_discrete(labels = c(TR_region = "TE region", no_TR_region = "Non TE region")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+p_2d
+save_fig(p_2d, "fig_2d", "section2", svg = FALSE)  # heavy
+
+df7 <- df7 %>% ungroup()
+stat_2d <- df7 %>%
+  wilcox_test(X1_plddt ~ tr) %>% add_significance("p") %>%
+  left_join(df7 %>% wilcox_effsize(X1_plddt ~ tr) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "2d", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2,
+            p, p.adj = p, p.adj.signif = p.signif, correction = "none (single comparison)",
+            effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_2d
+
+mm_2d <- df7 %>% group_by(tr) %>%
+  summarise(mean = mean(X1_plddt, na.rm = TRUE), median = median(X1_plddt, na.rm = TRUE),
+            n = sum(!is.na(X1_plddt)), .groups = "drop") %>%
+  transmute(figure_panel = "2d", group = as.character(tr), predictor = "AF 1-pLDDT", mean, median, n)
+mm_2d
+```
+
+```{r edf_2d}
+#### ED Fig 2d — position-level disorder TE vs non-TE (AF-RSA) ####
+p_edf2d <- ggplot(df7, aes(x = tr, y = af_rsa, fill = tr)) +
+  geom_boxplot() + scale_fill_manual(values = c(non_te_region, te_general_color)) +
+  labs(x = NULL, y = "Disorder (AF - RSA)", title = "") +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  scale_x_discrete(labels = c(TR_region = "TE region", no_TR_region = "Non TE region")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+p_edf2d
+save_fig(p_edf2d, "edf_2d", "section2")
+
+stat_ED2d <- df7 %>%
+  wilcox_test(af_rsa ~ tr) %>% add_significance("p") %>%
+  left_join(df7 %>% wilcox_effsize(af_rsa ~ tr) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED2d", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2,
+            p, p.adj = p, p.adj.signif = p.signif, correction = "none (single comparison)",
+            effsize_r = effsize, magnitude, predictor = "AF-RSA")
+stat_ED2d
+
+mm_ED2d <- df7 %>% group_by(tr) %>%
+  summarise(mean = mean(af_rsa, na.rm = TRUE), median = median(af_rsa, na.rm = TRUE),
+            n = sum(!is.na(af_rsa)), .groups = "drop") %>%
+  transmute(figure_panel = "ED2d", group = as.character(tr), predictor = "AF-RSA", mean, median, n)
+mm_ED2d
+```
+
+```{r edf_2e}
+#### ED Fig 2e — position-level disorder TE vs non-TE (PUNCH) ####
+p_edf2e <- ggplot(df7, aes(x = tr, y = punch, fill = tr)) +
+  geom_boxplot() + scale_fill_manual(values = c(non_te_region, te_general_color)) +
+  labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "") +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  scale_x_discrete(labels = c(TR_region = "TE region", no_TR_region = "Non TE region")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+p_edf2e
+save_fig(p_edf2e, "edf_2e", "section2")
+
+stat_ED2e <- df7 %>%
+  wilcox_test(punch ~ tr) %>% add_significance("p") %>%
+  left_join(df7 %>% wilcox_effsize(punch ~ tr) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED2e", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2,
+            p, p.adj = p, p.adj.signif = p.signif, correction = "none (single comparison)",
+            effsize_r = effsize, magnitude, predictor = "PUNCH 2-light")
+stat_ED2e
+
+mm_ED2e <- df7 %>% group_by(tr) %>%
+  summarise(mean = mean(punch, na.rm = TRUE), median = median(punch, na.rm = TRUE),
+            n = sum(!is.na(punch)), .groups = "drop") %>%
+  transmute(figure_panel = "ED2e", group = as.character(tr), predictor = "PUNCH 2-light", mean, median, n)
+mm_ED2e
+```
+
+```{r section2-setup}
+#### Section 2 derived objects ####
+best_te <- df3
+
+# df7 aliased to the legacy names; AF columns NA-filtered to match the AF-only object.
+dfam_disorder       <- df7 %>% rename(disorder = X1_plddt, disorder.25 = af_rsa) %>% filter(!is.na(disorder))
+dfam_disorder_punch <- df7
+
+inser_primates     <- best_te %>% filter(name %in% df4$Sub.family)
+inser_not_primates <- best_te %>% filter(!name %in% df4$Sub.family)
+
+dfam_disorder_primates       <- dfam_disorder       %>% filter(uniprot_id %in% inser_primates$uniprot_id)
+dfam_disorder_primates_punch <- dfam_disorder_punch %>% filter(uniprot_id %in% inser_primates$uniprot_id)
+
+te_primates     <- dfam_disorder %>% filter(uniprot_id %in% inser_primates$uniprot_id)     %>% mutate(primates = "yes")
+te_not_primates <- dfam_disorder %>% filter(uniprot_id %in% inser_not_primates$uniprot_id) %>% mutate(primates = "no")
+te_primates_full <- rbind(te_primates, te_not_primates)
+
+dfam_disorder_primates_te_type <- dfam_disorder_primates %>%
+  filter(tr == "TR_region") %>%
+  left_join(best_te %>% dplyr::select(uniprot_id, name, repeat_type_name) %>%
+              filter(name %in% df4$Sub.family) %>% distinct(), by = "uniprot_id") %>%
+  group_by(uniprot_id, name, repeat_type_name)
+
+dfam_disorder_primates_te_type_punch <- dfam_disorder_primates_punch %>%
+  filter(tr == "TR_region") %>%
+  left_join(best_te %>% dplyr::select(uniprot_id, name, repeat_type_name) %>%
+              filter(name %in% df4$Sub.family) %>% distinct(), by = "uniprot_id") %>%
+  group_by(uniprot_id, name, repeat_type_name)
+```
+
+```{r fig_2f}
+#### Fig 2f — primate TE region vs non-TE region (1-pLDDT) ####
+# Heavy panel: PNG only.
+p_2f <- ggplot(dfam_disorder_primates, aes(x = tr, y = disorder, fill = tr)) +
+  ggdist::stat_halfeye(side = "left", adjust = 0.8, width = 0.6, justification = 1.1, slab_alpha = 0.9) +
+  ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.5, size = 0.2, width = 0.4, quantiles = 1000) +
+  scale_fill_manual(values = c(non_te_region, te_general_color)) +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "") +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  scale_x_discrete(labels = c(TR_region = "TE region (primates)", no_TR_region = "Non TE region (primates)")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+p_2f
+save_fig(p_2f, "fig_2f", "section2", svg = FALSE)  # heavy
+
+dfam_disorder_primates <- dfam_disorder_primates %>% ungroup()
+stat_2f <- dfam_disorder_primates %>%
+  wilcox_test(disorder ~ tr) %>% add_significance("p") %>%
+  left_join(dfam_disorder_primates %>% wilcox_effsize(disorder ~ tr) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "2f", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2,
+            p, p.adj = p, p.adj.signif = p.signif, correction = "none (single comparison)",
+            effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_2f
+
+mm_2f <- dfam_disorder_primates %>% group_by(tr) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "2f", group = as.character(tr), predictor = "AF 1-pLDDT", mean, median, n)
+mm_2f
+```
+
+```{r fig_2e}
+#### Fig 2e — primate vs pre-primate TE insertions ####
+df_2e <- te_primates_full %>% filter(tr != "no_TR_region")
+
+p_2e <- ggplot(df_2e, aes(x = primates, y = disorder, fill = primates)) +
+  geom_boxplot() +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "") +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  scale_x_discrete(labels = c(yes = "TE, Primates", no = "TE, pre primates")) +
+  scale_fill_manual(values = c("yes" = custom_palette2[1], "no" = scales::alpha("#9E8BAE", 0.5))) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+p_2e
+save_fig(p_2e, "fig_2e", "section2")
+
+df_2e <- df_2e %>% ungroup()
+stat_2e <- df_2e %>%
+  wilcox_test(disorder ~ primates) %>% add_significance("p") %>%
+  left_join(df_2e %>% wilcox_effsize(disorder ~ primates) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "2e", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2,
+            p, p.adj = p, p.adj.signif = p.signif, correction = "none (single comparison)",
+            effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_2e
+
+mm_2e <- df_2e %>% group_by(primates) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "2e", group = as.character(primates), predictor = "AF 1-pLDDT", mean, median, n)
+mm_2e
+```
+
+```{r fig_2g}
+#### Fig 2g — disorder vs distance from TE (flanking regions) ####
+dist_primates <- dfam_disorder_primates %>% group_by(uniprot_id) %>%
+  mutate(
+    dist_downstream = {
+      te_pos <- pos[tr == "TR_region"]
+      ifelse(tr == "TR_region", 0,
+        sapply(pos, function(p) { d <- p - te_pos; m <- d[d > 0]; if (length(m) == 0) NA_real_ else min(m) }))
+    },
+    dist_upstream = {
+      te_pos <- pos[tr == "TR_region"]
+      ifelse(tr == "TR_region", 0,
+        sapply(pos, function(p) { d <- te_pos - p; m <- d[d > 0]; if (length(m) == 0) NA_real_ else min(m) }))
+    }) %>% ungroup() %>%
+  mutate(region = case_when(
+    tr == "TR_region"     ~ "TE",
+    dist_upstream   <= 10 ~ "Non-TE upstream 10",
+    dist_upstream   <= 25 ~ "Non-TE upstream 25",
+    dist_upstream   <= 50 ~ "Non-TE upstream 50",
+    dist_upstream   <= 75 ~ "Non-TE upstream 75",
+    dist_downstream <= 10 ~ "Non-TE downstream 10",
+    dist_downstream <= 25 ~ "Non-TE downstream 25",
+    dist_downstream <= 50 ~ "Non-TE downstream 50",
+    dist_downstream <= 75 ~ "Non-TE downstream 75",
+    TRUE                  ~ NA_character_)) %>%
+  filter(!is.na(region))
+
+region_levels <- c("Non-TE upstream 75", "Non-TE upstream 50", "Non-TE upstream 25", "Non-TE upstream 10",
+                   "TE",
+                   "Non-TE downstream 10", "Non-TE downstream 25", "Non-TE downstream 50", "Non-TE downstream 75")
+cmp_te <- lapply(region_levels[region_levels != "TE"], function(r) c("TE", r))
+
+p_2g <- dist_primates %>%
+  mutate(region = factor(region, levels = region_levels)) %>%
+  ggplot(aes(x = region, y = disorder, fill = region)) +
+  geom_boxplot(outlier.shape = NA) +
+  stat_compare_means(comparisons = cmp_te, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_manual(values = c(
+    "Non-TE upstream 75" = scales::alpha(non_te_region, 0.4), "Non-TE upstream 50" = scales::alpha(non_te_region, 0.5),
+    "Non-TE upstream 25" = scales::alpha(non_te_region, 0.7), "Non-TE upstream 10" = scales::alpha(non_te_region, 0.9),
+    "TE" = te_general_color,
+    "Non-TE downstream 10" = scales::alpha(non_te_region, 0.9), "Non-TE downstream 25" = scales::alpha(non_te_region, 0.7),
+    "Non-TE downstream 50" = scales::alpha(non_te_region, 0.5), "Non-TE downstream 75" = scales::alpha(non_te_region, 0.4))) +
+  theme_classic() +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 10), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), legend.position = "none")
+p_2g
+save_fig(p_2g, "fig_2g", "section2", width = 16)  # wider panel
+
+dist_primates2 <- dist_primates %>% mutate(region = factor(region, levels = region_levels)) %>% ungroup()
+stat_2g <- dist_primates2 %>%
+  wilcox_test(disorder ~ region, ref.group = "TE", p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(dist_primates2 %>% wilcox_effsize(disorder ~ region, ref.group = "TE") %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  mutate(side = case_when(grepl("upstream", group2) ~ "upstream",
+                          grepl("downstream", group2) ~ "downstream", TRUE ~ NA_character_),
+         distance = as.integer(stringr::str_extract(group2, "[0-9]+"))) %>%
+  arrange(side, distance) %>%
+  transmute(figure_panel = "2g", comparison = paste(group1, "vs", group2), side, distance,
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_2g
+
+mm_2g <- dist_primates2 %>% group_by(region) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "2g", group = as.character(region), predictor = "AF 1-pLDDT", mean, median, n)
+mm_2g
+```
+
+```{r fig_2g_bar}
+#### Fig 2g-bar — repeat-type composition of primate TE insertions ####
+df_rep2 <- dfam_disorder_primates_te_type %>% dplyr::select(uniprot_id, repeat_type_name) %>%
+  distinct() %>% group_by(repeat_type_name) %>% summarise(n = n())
+rep_levels2 <- df_rep2 %>% arrange(n) %>% pull(repeat_type_name)
+df_rep_pct2 <- df_rep2 %>% mutate(repeat_type_name = factor(repeat_type_name, levels = rep_levels2),
+                                  pct = 100 * n / sum(n))
+
+p_2g_bar <- ggplot(df_rep_pct2, aes(x = pct, y = repeat_type_name, fill = repeat_type_name)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = paste0(round(pct, 2), "%")), hjust = -0.2, size = 4) +
+  coord_cartesian(xlim = c(NA, 100)) +
+  labs(x = "Percentage", y = NULL, title = "") +
+  theme_classic() +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme(axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12), legend.position = "none")
+p_2g_bar
+save_fig(p_2g_bar, "fig_2h", "section2")  # composition panel = Fig 2h
+```
+
+```{r fig_2i}
+#### Fig 2i — disorder by TE class (1-pLDDT) ####
+df_plot <- dfam_disorder_primates_te_type %>% mutate(repeat_type_name = reorder(repeat_type_name, disorder, FUN = mean))
+cmp_te_types <- combn(levels(factor(df_plot$repeat_type_name)), 2, simplify = FALSE)
+
+p_2i <- ggplot(df_plot, aes(x = repeat_type_name, y = disorder, fill = repeat_type_name)) +
+  geom_boxplot(outlier.size = 0.5) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "")
+p_2i
+save_fig(p_2i, "fig_2i", "section2")
+
+df_plot <- df_plot %>% ungroup()
+stat_2i <- df_plot %>%
+  wilcox_test(disorder ~ repeat_type_name, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_plot %>% wilcox_effsize(disorder ~ repeat_type_name) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "2i", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_2i
+
+mm_2i <- df_plot %>% group_by(repeat_type_name) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "2i", group = as.character(repeat_type_name), predictor = "AF 1-pLDDT", mean, median, n)
+mm_2i
+```
+
+```{r edf_3b}
+#### ED Fig 3b — disorder by TE class (AF-RSA) ####
+df_plot <- dfam_disorder_primates_te_type %>% mutate(repeat_type_name = reorder(repeat_type_name, disorder.25, FUN = mean))
+cmp_te_types <- combn(levels(factor(df_plot$repeat_type_name)), 2, simplify = FALSE)
+
+p_edf3b <- ggplot(df_plot, aes(x = repeat_type_name, y = disorder.25, fill = repeat_type_name)) +
+  geom_boxplot(outlier.size = 0.5) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (AF - RSA)", title = "")
+p_edf3b
+save_fig(p_edf3b, "edf_3b", "section2")
+
+df_plot <- df_plot %>% ungroup()
+stat_ED3b <- df_plot %>%
+  wilcox_test(disorder.25 ~ repeat_type_name, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_plot %>% wilcox_effsize(disorder.25 ~ repeat_type_name) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED3b", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF-RSA")
+stat_ED3b
+
+mm_ED3b <- df_plot %>% group_by(repeat_type_name) %>%
+  summarise(mean = mean(disorder.25), median = median(disorder.25), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED3b", group = as.character(repeat_type_name), predictor = "AF-RSA", mean, median, n)
+mm_ED3b
+```
+
+```{r edf_3c}
+#### ED Fig 3c — disorder by TE class (PUNCH) ####
+df_plot <- dfam_disorder_primates_te_type_punch %>% mutate(repeat_type_name = reorder(repeat_type_name, punch, FUN = mean))
+cmp_te_types <- combn(levels(factor(df_plot$repeat_type_name)), 2, simplify = FALSE)
+
+p_edf3c <- ggplot(df_plot, aes(x = repeat_type_name, y = punch, fill = repeat_type_name)) +
+  geom_boxplot(outlier.size = 0.5) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
+p_edf3c
+save_fig(p_edf3c, "edf_3c", "section2")
+
+df_plot <- df_plot %>% ungroup()
+stat_ED3c <- df_plot %>%
+  wilcox_test(punch ~ repeat_type_name, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_plot %>% wilcox_effsize(punch ~ repeat_type_name) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED3c", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "PUNCH 2-light")
+stat_ED3c
+
+mm_ED3c <- df_plot %>% group_by(repeat_type_name) %>%
+  summarise(mean = mean(punch), median = median(punch), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED3c", group = as.character(repeat_type_name), predictor = "PUNCH 2-light", mean, median, n)
+mm_ED3c
+```
+
+```{r edf_3d}
+#### ED Fig 3d — SVA subfamilies (1-pLDDT) ####
+df_plot   <- dfam_disorder_primates_te_type %>% mutate(repeat_type_name = reorder(repeat_type_name, disorder, FUN = mean))
+df_plot_sva <- df_plot %>% filter(repeat_type_name == "Retroposon")
+
+sva_non_redundant <- read.csv("../data/SVA_unique_ENSTs.tsv", sep = "\t") %>% dplyr::select(ENST)
+sva_non_redundant_ids <- best_te %>% filter(repeat_type_name == "Retroposon") %>%
+  dplyr::select(target_name, uniprot_id) %>%
+  filter(target_name %in% sva_non_redundant$ENST) %>% distinct()
+
+cmp_te_types <- combn(levels(factor(df_plot_sva$name)), 2, simplify = FALSE)
+
+p_edf3d <- ggplot(df_plot_sva %>% filter(uniprot_id %in% sva_non_redundant_ids$uniprot_id),
+                  aes(x = name, y = disorder, fill = name)) +
+  geom_boxplot(outlier.size = 0.5) +
+  scale_fill_manual(values = c("SVA_A" = "#1F5C5C", "SVA_C" = "#2A7A7A", "SVA_D" = "#3D9E9E", "SVA_E" = "#52AAAA")) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "")
+p_edf3d
+save_fig(p_edf3d, "edf_3d", "section2")
+
+df_plot_sva_f <- df_plot_sva %>% filter(uniprot_id %in% sva_non_redundant_ids$uniprot_id) %>% ungroup()
+stat_ED3d <- df_plot_sva_f %>%
+  wilcox_test(disorder ~ name, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_plot_sva_f %>% wilcox_effsize(disorder ~ name) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "ED3d", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_ED3d
+
+mm_ED3d <- df_plot_sva_f %>% group_by(name) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED3d", group = as.character(name), predictor = "AF 1-pLDDT", mean, median, n)
+mm_ED3d
+```
+
+```{r edf_5a_comp}
+#### ED Fig 5a — subfamily composition ####
+df_rep3 <- dfam_disorder_primates_te_type %>% dplyr::select(uniprot_id, name) %>%
+  distinct() %>% group_by(name) %>% summarise(n = n())
+rep_levels3 <- df_rep3 %>% arrange(n) %>% pull(name)
+df_rep_pct3 <- df_rep3 %>% mutate(name = factor(name, levels = rep_levels3), pct = 100 * n / sum(n))
+
+p_edf5a <- ggplot(df_rep_pct3, aes(x = pct, y = name, fill = name)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = paste0(round(pct, 2), "%")), hjust = -0.2, size = 4) +
+  labs(x = "Percentage", y = NULL, title = "") +
+  theme_classic() +
+  coord_cartesian(xlim = c(NA, 62)) +
+  theme(axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 9),
+        axis.text.y = element_text(size = 12), legend.position = "none")
+p_edf5a
+save_fig(p_edf5a, "edf_5a", "section2")
+```
+
+```{r edf_5d}
+#### ED Fig 5d — insertion length by TE class ####
+len_df_primates <- dfam_disorder_primates %>% filter(tr == "TR_region") %>%
+  left_join(best_te %>% dplyr::select(uniprot_id, name, repeat_type_name) %>%
+              filter(name %in% df4$Sub.family)) %>%
+  group_by(uniprot_id, repeat_type_name) %>% summarise(n = n(), .groups = "drop")
+
+p_edf5d <- ggplot(len_df_primates, aes(x = n, fill = repeat_type_name)) +
+  geom_boxplot() +
+  facet_wrap(~ repeat_type_name, ncol = 2) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 11), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.text = element_text(size = 16), legend.position = "none") +
+  labs(x = "Length", y = "Density", title = "")
+p_edf5d
+save_fig(p_edf5d, "edf_5d", "section2")
+
+mm_ED5d_len <- len_df_primates %>% group_by(repeat_type_name) %>%
+  summarise(mean = mean(n), median = median(n), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED5d", group = as.character(repeat_type_name), predictor = "length (aa)", mean, median, n)
+mm_ED5d_len
+```
+
+# ============================================================
+# SECTION 3 — Figure 3 (GC / compositional determinants)
+# ============================================================
+
+```{r load-df8-df9}
+df8 <- read.csv("../data/supplementary_table_8.csv")  # Genomic simulated TEs
+df9 <- read.csv("../data/supplementary_table_9.csv")  # GC content per ENST
+```
+```{r}
+df8
+df9
+dfam_disorder_punch
+```
+
+```{r section3-setup}
+df_sims_disorer_gc <- df8 %>% dplyr::select(name, repeat_type_name, pos, aa, punch, gc_content, source, uniprot_id)
+data_gc <- df9 %>% dplyr::select(ENST, start, end, GC_percent, length_bp)
+
+# Primate CDS side: mean PUNCH per primate TE insertion + GC from data_gc
+df_cors <- dfam_disorder_punch %>%
+  filter(uniprot_id %in% inser_primates$uniprot_id) %>%
+  filter(tr == "TR_region") %>%
+  dplyr::select(uniprot_id, punch, pos) %>%
+  group_by(uniprot_id) %>%
+  summarise(mean_disorder = mean(punch, na.rm = TRUE), length = n(),
+            start_aa = min(pos), end_aa = max(pos), .groups = "drop") %>%
+  inner_join(best_te %>% dplyr::select(uniprot_id, target_name, repeat_type_name, name), by = "uniprot_id") %>%
+  inner_join(data_gc, by = c("target_name" = "ENST")) %>%
+  filter(repeat_type_name != "RC", repeat_type_name != "PLE", repeat_type_name != "LTR") %>% # remove TE types that are not primate unique
+  dplyr::select(uniprot_id, mean_disorder, repeat_type_name, name, GC_percent)
+
+df_te_disorer_gc <- left_join(
+  dfam_disorder_primates_te_type_punch %>% dplyr::select(-tr),
+  df_cors %>% dplyr::select(-mean_disorder),
+  by = c("uniprot_id", "name", "repeat_type_name")) %>%
+  mutate(source = "Primate") %>% rename(gc_content = GC_percent)
+
+df_sims_te_disorder_gc <- rbind(df_sims_disorer_gc, df_te_disorer_gc)
+```
+
+```{r fig_3b}
+#### Fig 3b — GC by TE class (Primate CDS) ####
+cmp_te_types <- combn(unique(df_cors$repeat_type_name), 2, simplify = FALSE)
+
+p_3b <- ggplot(df_cors, aes(x = repeat_type_name, y = GC_percent, fill = repeat_type_name)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  labs(x = NULL, y = "GC %", title = "")
+p_3b
+save_fig(p_3b, "fig_3b", "section3")
+
+df_cors <- df_cors %>% ungroup()
+stat_3b <- df_cors %>%
+  wilcox_test(GC_percent ~ repeat_type_name, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_cors %>% wilcox_effsize(GC_percent ~ repeat_type_name) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "3b", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = NA_character_)
+stat_3b
+
+mm_3b <- df_cors %>% group_by(repeat_type_name) %>%
+  summarise(mean = mean(GC_percent), median = median(GC_percent), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3b", group = as.character(repeat_type_name), predictor = "GC %", mean, median, n)
+mm_3b
+```
+
+```{r fig_3c}
+#### Fig 3c — GC: Genomic vs Primate by TE class ####
+df_3c <- df_sims_te_disorder_gc %>%
+  dplyr::select(name, repeat_type_name, gc_content, source) %>%
+  group_by(name, repeat_type_name, gc_content, source) %>% distinct() %>% ungroup()
+
+p_3c <- df_3c %>%
+  mutate(fill_group = if_else(source == "Genomic", "Genomic", repeat_type_name)) %>%
+  ggplot(aes(x = source, y = gc_content, fill = fill_group)) +
+  geom_boxplot(outlier.shape = NA) +
+  facet_wrap(~repeat_type_name) +
+  geom_hline(yintercept = 60, linetype = "dotted", color = "grey40", linewidth = 0.7) +
+  scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
+                               "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
+  stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
+                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  labs(x = NULL, y = "GC %", title = "")
+p_3c
+save_fig(p_3c, "fig_3c", "section3")
+
+stat_3c <- df_3c %>%
+  group_by(repeat_type_name) %>% wilcox_test(gc_content ~ source) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_3c %>% group_by(repeat_type_name) %>% wilcox_effsize(gc_content ~ source) %>%
+              ungroup() %>% select(repeat_type_name, group1, group2, effsize, magnitude),
+            by = c("repeat_type_name", "group1", "group2")) %>%
+  transmute(figure_panel = "3c", facet_class = repeat_type_name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across classes)", effsize_r = effsize, magnitude, predictor = NA_character_)
+stat_3c
+
+mm_3c <- df_3c %>% filter(!is.na(gc_content)) %>% group_by(repeat_type_name, source) %>%
+  summarise(mean = mean(gc_content), median = median(gc_content), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3c", group = paste(repeat_type_name, source), predictor = "GC %", mean, median, n)
+mm_3c
+```
+
+```{r fig_3d}
+#### Fig 3d — PUNCH: Genomic vs Primate by TE class ####
+df_3d <- df_sims_te_disorder_gc %>% ungroup()
+
+p_3d <- df_3d %>%
+  mutate(fill_group = if_else(source == "Genomic", "Genomic", repeat_type_name)) %>%
+  ggplot(aes(x = source, y = punch, fill = fill_group)) +
+  geom_boxplot(outlier.shape = NA) +
+  facet_wrap(~repeat_type_name) +
+  geom_hline(yintercept = 0.35, linetype = "dotted", color = "grey40", linewidth = 0.7) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
+  stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
+                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+  scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
+                               "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
+p_3d
+save_fig(p_3d, "fig_3d", "section3")
+
+stat_3d <- df_3d %>%
+  group_by(repeat_type_name) %>% wilcox_test(punch ~ source) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_3d %>% group_by(repeat_type_name) %>% wilcox_effsize(punch ~ source) %>%
+              ungroup() %>% select(repeat_type_name, group1, group2, effsize, magnitude),
+            by = c("repeat_type_name", "group1", "group2")) %>%
+  transmute(figure_panel = "3d", facet_class = repeat_type_name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across classes)", effsize_r = effsize, magnitude, predictor = "PUNCH 2-light")
+stat_3d
+
+mm_3d <- df_3d %>% group_by(repeat_type_name, source) %>%
+  summarise(mean = mean(punch), median = median(punch), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3d", group = paste(repeat_type_name, source), predictor = "PUNCH 2-light", mean, median, n)
+mm_3d
+```
+
+```{r fig_3e}
+#### Fig 3e — GC: Genomic vs Primate, Alu subfamilies ####
+df_3e <- df_sims_te_disorder_gc %>%
+  dplyr::select(name, repeat_type_name, gc_content, source) %>%
+  group_by(name, repeat_type_name, gc_content, source) %>% distinct() %>% ungroup() %>%
+  filter(repeat_type_name == "SINE") %>%
+  mutate(name = coalesce(str_extract(name, "^Alu[JSY]"), name)) %>%
+  filter(name != "7SLRNA")
+
+p_3e <- df_3e %>%
+  mutate(fill_group = if_else(source == "Genomic", "Genomic", repeat_type_name)) %>%
+  ggplot(aes(x = source, y = gc_content, fill = fill_group)) +
+  geom_boxplot(outlier.shape = NA) + facet_wrap(~name) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
+  geom_hline(yintercept = 60, linetype = "dotted", color = "grey40", linewidth = 0.7) +
+  stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
+                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+  scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
+                               "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  labs(x = NULL, y = "GC %", title = "")
+p_3e
+save_fig(p_3e, "fig_3e", "section3")
+
+stat_3e <- df_3e %>%
+  group_by(name) %>% wilcox_test(gc_content ~ source) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_3e %>% group_by(name) %>% wilcox_effsize(gc_content ~ source) %>%
+              ungroup() %>% select(name, group1, group2, effsize, magnitude),
+            by = c("name", "group1", "group2")) %>%
+  transmute(figure_panel = "3e", facet_class = name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across subfamilies)", effsize_r = effsize, magnitude, predictor = NA_character_)
+stat_3e
+
+mm_3e <- df_3e %>% filter(!is.na(gc_content)) %>% group_by(name, source) %>%
+  summarise(mean = mean(gc_content), median = median(gc_content), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3e", group = paste(name, source), predictor = "GC %", mean, median, n)
+mm_3e
+```
+
+```{r fig_3g}
+#### Fig 3g — GC: Genomic vs Primate, SVA subfamilies ####
+df_3g <- df_sims_te_disorder_gc %>%
+  dplyr::select(name, repeat_type_name, gc_content, source) %>%
+  group_by(name, repeat_type_name, gc_content, source) %>% distinct() %>% ungroup() %>%
+  filter(repeat_type_name == "Retroposon") %>%
+  filter(name %in% c("SVA_A", "SVA_C", "SVA_D", "SVA_E")) %>%
+  mutate(name = case_when(name == "SVA_A" ~ "SVA_A",
+                          name %in% c("SVA_C", "SVA_D", "SVA_E") ~ "SVA_C/D/E", TRUE ~ name)) %>%
+  mutate(name = factor(name, levels = c("SVA_A", "SVA_C/D/E")))
+
+p_3g <- df_3g %>%
+  mutate(fill_group = if_else(source == "Genomic", "Genomic", repeat_type_name)) %>%
+  ggplot(aes(x = source, y = gc_content, fill = fill_group)) +
+  geom_boxplot(outlier.shape = NA) + facet_wrap(~name) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
+  geom_hline(yintercept = 60, linetype = "dotted", color = "grey40", linewidth = 0.7) +
+  stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
+                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+  scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
+                               "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  labs(x = NULL, y = "GC %", title = "")
+p_3g
+save_fig(p_3g, "fig_3g", "section3")
+
+stat_3g <- df_3g %>%
+  group_by(name) %>% wilcox_test(gc_content ~ source) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_3g %>% group_by(name) %>% wilcox_effsize(gc_content ~ source) %>%
+              ungroup() %>% select(name, group1, group2, effsize, magnitude),
+            by = c("name", "group1", "group2")) %>%
+  transmute(figure_panel = "3g", facet_class = name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across subfamilies)", effsize_r = effsize, magnitude, predictor = NA_character_)
+stat_3g
+
+mm_3g <- df_3g %>% filter(!is.na(gc_content)) %>% group_by(name, source) %>%
+  summarise(mean = mean(gc_content), median = median(gc_content), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3g", group = paste(name, source), predictor = "GC %", mean, median, n)
+mm_3g
+```
+
+```{r fig_3f}
+#### Fig 3f — PUNCH: Genomic vs Primate, Alu subfamilies ####
+df_3f <- df_sims_te_disorder_gc %>%
+  filter(repeat_type_name == "SINE") %>%
+  mutate(name = coalesce(str_extract(name, "^Alu[JSY]"), name)) %>%
+  filter(name != "7SLRNA") %>% ungroup()
+
+p_3f <- df_3f %>%
+  mutate(fill_group = if_else(source == "Genomic", "Genomic", repeat_type_name)) %>%
+  ggplot(aes(x = source, y = punch, fill = fill_group)) +
+  geom_boxplot(outlier.shape = NA) + facet_wrap(~name) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
+  geom_hline(yintercept = 0.35, linetype = "dotted", color = "grey40", linewidth = 0.7) +
+  stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
+                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+  scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
+                               "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
+p_3f
+save_fig(p_3f, "fig_3f", "section3")
+
+stat_3f <- df_3f %>%
+  group_by(name) %>% wilcox_test(punch ~ source) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_3f %>% group_by(name) %>% wilcox_effsize(punch ~ source) %>%
+              ungroup() %>% select(name, group1, group2, effsize, magnitude),
+            by = c("name", "group1", "group2")) %>%
+  transmute(figure_panel = "3f", facet_class = name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across subfamilies)", effsize_r = effsize, magnitude, predictor = "PUNCH 2-light")
+stat_3f
+
+mm_3f <- df_3f %>% group_by(name, source) %>%
+  summarise(mean = mean(punch), median = median(punch), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3f", group = paste(name, source), predictor = "PUNCH 2-light", mean, median, n)
+mm_3f
+```
+
+```{r fig_3h}
+#### Fig 3h — PUNCH: Genomic vs Primate, SVA subfamilies ####
+df_3h <- df_sims_te_disorder_gc %>%
+  filter(repeat_type_name == "Retroposon") %>%
+  filter(name %in% c("SVA_A", "SVA_C", "SVA_D", "SVA_E")) %>%
+  mutate(name = case_when(name == "SVA_A" ~ "SVA_A",
+                          name %in% c("SVA_C", "SVA_D", "SVA_E") ~ "SVA_C/D/E", TRUE ~ name)) %>%
+  mutate(name = factor(name, levels = c("SVA_A", "SVA_C/D/E"))) %>% ungroup()
+
+p_3h <- df_3h %>%
+  mutate(fill_group = if_else(source == "Genomic", "Genomic", repeat_type_name)) %>%
+  ggplot(aes(x = source, y = punch, fill = fill_group)) +
+  geom_boxplot(outlier.shape = NA) + facet_wrap(~name) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
+  geom_hline(yintercept = 0.35, linetype = "dotted", color = "grey40", linewidth = 0.7) +
+  stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
+                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+  scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
+                               "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
+p_3h
+save_fig(p_3h, "fig_3h", "section3")
+
+stat_3h <- df_3h %>%
+  group_by(name) %>% wilcox_test(punch ~ source) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_3h %>% group_by(name) %>% wilcox_effsize(punch ~ source) %>%
+              ungroup() %>% select(name, group1, group2, effsize, magnitude),
+            by = c("name", "group1", "group2")) %>%
+  transmute(figure_panel = "3h", facet_class = name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "fragments", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across subfamilies)", effsize_r = effsize, magnitude, predictor = "PUNCH 2-light")
+stat_3h
+
+mm_3h <- df_3h %>% group_by(name, source) %>%
+  summarise(mean = mean(punch), median = median(punch), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "3h", group = paste(name, source), predictor = "PUNCH 2-light", mean, median, n)
+mm_3h
+```
+
+# ============================================================
+# SECTION 4 — Figure 4 (Kimura age, Z-score, orthology) + ED Fig 5
+# ============================================================
+
+```{r load-df10-df11}
+df10 <- read.csv("../data/supplementary_table_10.csv")  # Kimura RMBlast (df_total_rmblast)
+df11 <- read.csv("../data/supplementary_table_11.csv")  # Z-score (z_score_kimura)
+```
+
+```{r section4-setup}
+df_total_rmblast <- df10 %>%
+  dplyr::select(id, family, alig_len, kimura_divergence, source, group, group_clean, source_2)
+# df10 is already filtered to primate-specific families (only the 4 classes present).
+```
+
+```{r fig_4a}
+#### Fig 4a — all-TE Kimura divergence, CDS vs Genome ####
+# Heavy density panel: PNG only.
+p_4a <- df_total_rmblast %>%
+  mutate(source_2 = factor(source_2, levels = c("Genome", "CDS"))) %>%
+  ggplot() +
+  aes(x = kimura_divergence, fill = source_2, weight = alig_len) +
+  geom_density(color = "black", adjust = 1.2) +
+  geom_rug(data = df_total_rmblast %>% filter(group_clean == "Alu", source_2 == "CDS"),
+           aes(x = kimura_divergence), color = te_general_color, sides = "b", alpha = 0.8) +
+  theme_classic() +
+  scale_fill_manual(values = c("Genome" = no_te_color, "CDS" = te_general_color)) +
+  labs(title = "", x = "Kimura Divergence (CpG adjusted)", y = "Density", fill = "") +
+  theme(legend.position = "top", panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+p_4a
+save_fig(p_4a, "fig_4a", "section4", svg = FALSE)  # heavy
+```
+
+```{r fig_4b}
+#### Fig 4b — per-class Kimura divergence ####
+# Heavy density panel: PNG only.
+groups <- c("DNA_Transposons", "SVA", "LINE-1", "Alu")
+labels_k <- c(DNA_Transposons = "DNA", SVA = "Retroposon", `LINE-1` = "LINE", Alu = "SINE")
+
+df_facet <- df_total_rmblast %>%
+  filter(group_clean %in% groups) %>%
+  mutate(panel = factor(labels_k[group_clean], levels = c("SINE", "LINE", "DNA", "Retroposon")),
+         fill_class = factor(ifelse(source_2 == "CDS", labels_k[group_clean], "Non coding"),
+                             levels = c("Non coding", "SINE", "LINE", "DNA", "Retroposon")))
+
+p_4b <- ggplot(df_facet, aes(x = kimura_divergence, fill = fill_class, weight = alig_len)) +
+  geom_density(color = "black", adjust = 1.2) +
+  geom_rug(data = df_facet %>% filter(source_2 == "CDS"),
+           aes(x = kimura_divergence), color = "#3D6446", sides = "b", alpha = 0.8, inherit.aes = FALSE) +
+  facet_wrap(~ panel, scales = "free_y") +
+  scale_fill_manual(values = c("Non coding" = no_te_color, "SINE" = "#3D6446", "LINE" = "#BC7443",
+                               "DNA" = "#B4747C", "Retroposon" = "#2A7A7A")) +
+  theme_classic() +
+  labs(x = "Kimura Divergence (CpG adjusted)", y = "Density", fill = "") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none")
+p_4b
+save_fig(p_4b, "fig_4b", "section4", svg = FALSE)  # heavy
+```
+
+```{r zscore-join}
+#### Z-score join (df11 -> disorder) ####
+z_score_kimura <- df11 %>% dplyr::select(uniprot_id, id, kimura_divergence, dfam_id, robust_zscore)
+
+zscore_primates <- inser_primates %>%
+  dplyr::select(uniprot_id, target_name, dfam_id, repeat_type_name, name) %>%
+  inner_join(z_score_kimura, by = c("uniprot_id", "target_name" = "id", "dfam_id"))
+
+disorder_zscore <- dfam_disorder %>% filter(uniprot_id %in% zscore_primates$uniprot_id)
+disorder_zscore_primates <- left_join(disorder_zscore, zscore_primates, by = "uniprot_id") %>% distinct()
+```
+
+```{r fig_4c}
+#### Fig 4c — Z-score density (all) ####
+# Heavy density panel: PNG only.
+p_4c <- disorder_zscore_primates %>%
+  dplyr::select(uniprot_id, robust_zscore) %>% distinct() %>%
+  ggplot(aes(x = robust_zscore)) +
+  geom_density(fill = "#C96B5C", color = "#A0443A", alpha = 0.7) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey40", linewidth = 0.5) +
+  geom_vline(xintercept = c(-2, 2), linetype = "dotted", color = "grey60", linewidth = 0.5) +
+  annotate("rect", xmin = -Inf, xmax = -2, ymin = -Inf, ymax = Inf, fill = "#44749A", alpha = 0.08) +
+  annotate("rect", xmin = 2, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "#44749A", alpha = 0.08) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 11), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20)) +
+  labs(x = "Robust Z-score Kimura CpG", y = "Density", title = "")
+p_4c
+save_fig(p_4c, "fig_4c", "section4", svg = FALSE)  # heavy
+```
+
+```{r fig_4d}
+#### Fig 4d — young vs old SINE insertions (pooled) ####
+df_zscore_sine <- disorder_zscore_primates %>%
+  filter(repeat_type_name == "SINE") %>%
+  filter(robust_zscore <= -2 | robust_zscore >= 2) %>%
+  mutate(zscore_group = if_else(robust_zscore <= -2, "\u2264 -2, young", "\u2265 2, old")) %>%
+  filter(tr != "no_TR_region")
+
+p_4d <- ggplot(df_zscore_sine, aes(x = zscore_group, y = disorder, fill = zscore_group)) +
+  geom_boxplot(outlier.shape = NA) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif",
+                     comparisons = list(c("\u2264 -2, young", "\u2265 2, old"))) +
+  scale_fill_manual(values = c("\u2265 2, old" = "#2A4F35", "\u2264 -2, young" = "#6AAF7C")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  theme_classic() +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)") +
+  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), legend.position = "none")
+p_4d
+save_fig(p_4d, "fig_4d", "section4")
+
+df_zscore_sine <- df_zscore_sine %>% ungroup()
+stat_4d <- df_zscore_sine %>%
+  wilcox_test(disorder ~ zscore_group) %>% add_significance("p") %>%
+  left_join(df_zscore_sine %>% wilcox_effsize(disorder ~ zscore_group) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "4d", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2,
+            p, p.adj = p, p.adj.signif = p.signif, correction = "none (single comparison)",
+            effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_4d
+
+mm_4d <- df_zscore_sine %>% group_by(zscore_group) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "4d", group = as.character(zscore_group), predictor = "AF 1-pLDDT", mean, median, n)
+mm_4d
+```
+
+```{r edf_5a_zscore}
+#### ED Fig 5a — young vs old, per Alu subfamily ####
+p_edf5a_z <- ggplot(df_zscore_sine, aes(x = zscore_group, y = disorder, fill = zscore_group)) +
+  geom_boxplot(outlier.shape = NA) +
+  facet_wrap(~name) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif",
+                     comparisons = list(c("\u2264 -2, young", "\u2265 2, old"))) +
+  scale_fill_manual(values = c("\u2265 2, old" = "#2A4F35", "\u2264 -2, young" = "#6AAF7C")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  theme_classic() +
+  labs(x = NULL, y = "Disorder (1 - pLDDT)") +
+  theme(axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), strip.text = element_text(size = 12),
+        strip.background = element_blank(), legend.position = "none")
+p_edf5a_z
+save_fig(p_edf5a_z, "edf_5a_zscore", "section4")
+
+stat_ED5a <- df_zscore_sine %>%
+  group_by(name) %>% wilcox_test(disorder ~ zscore_group) %>% ungroup() %>%
+  adjust_pvalue(method = "BH") %>% add_significance("p.adj") %>%
+  left_join(df_zscore_sine %>% group_by(name) %>% wilcox_effsize(disorder ~ zscore_group) %>%
+              ungroup() %>% select(name, group1, group2, effsize, magnitude),
+            by = c("name", "group1", "group2")) %>%
+  transmute(figure_panel = "ED5a", facet_class = name, comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH (across subfamilies)", effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_ED5a
+
+mm_ED5a <- df_zscore_sine %>% group_by(zscore_group, name) %>%
+  summarise(mean = mean(disorder), median = median(disorder), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "ED5a", group = paste(name, zscore_group), predictor = "AF 1-pLDDT", mean, median, n)
+mm_ED5a
+```
+
+```{r load-df12}
+df12 <- read.csv("../data/supplementary_table_12.csv")  # cluster_monkies_primate
+```
+
+```{r section4-orthology-setup}
+cluster_monkies_primate <- df12 %>%
+  mutate(species_cluster = factor(species_cluster,
+           levels = c("Human / great apes", "Old World monkeys", "New World monkeys")))
+
+x_labs <- cluster_monkies_primate %>% dplyr::select(species_cluster) %>%
+  group_by(species_cluster) %>% summarise(n = n())
+
+lv_tr <- levels(droplevels(cluster_monkies_primate$species_cluster))
+pal_purple <- setNames(
+  colorRampPalette(c("#3E2D63", "#5B4390", "#7B5EA7", "#9678BA", "#B69DD0", "#D8C4E6"))(length(lv_tr)), lv_tr)
+```
+
+```{r fig_4e}
+#### Fig 4e — TE-class composition per clade (insertion counts) ####
+plot_df_4e <- cluster_monkies_primate %>%
+  dplyr::select(uniprot_id, species_cluster, repeat_type_name) %>%
+  distinct() %>%
+  group_by(species_cluster, repeat_type_name) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(repeat_type_name = fct_reorder(repeat_type_name, n))
+
+p_4e <- ggplot(plot_df_4e, aes(x = species_cluster, y = n, fill = repeat_type_name)) +
+  geom_col(position = position_dodge(width = 0.9, preserve = "single")) +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9, preserve = "single"), vjust = -0.4, size = 6) +
+  scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
+  labs(x = "Last species cluster with TE", y = "Number of TE insertions", fill = "Repeat Type") +
+  theme_classic() +
+  coord_cartesian(ylim = c(NA, 31)) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 11), axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), strip.text = element_text(size = 16))
+p_4e
+save_fig(p_4e, "fig_4e", "section4")
+```
+
+```{r fig_4f}
+#### Fig 4f — disorder by clade (halfeye + dots) ####
+# Heavy panel: PNG only.
+cmp_mk_lm <- combn(levels(droplevels(cluster_monkies_primate$species_cluster)), 2, simplify = FALSE)
+
+boot_median <- function(data, indices) median(data[indices])
+bootstrap_ci <- cluster_monkies_primate %>%
+  group_by(species_cluster) %>%
+  summarise(median_val = median(tr_pLDDT),
+            lower = boot.ci(boot(tr_pLDDT, boot_median, R = 1000), type = "perc")$percent[4],
+            upper = boot.ci(boot(tr_pLDDT, boot_median, R = 1000), type = "perc")$percent[5],
+            n = n(), .groups = "drop")
+bootstrap_ci
+
+# x-axis labels as a named vector (cluster + n)
+x_lab_vec <- setNames(paste0(x_labs$species_cluster, "\n(n=", x_labs$n, ")"),
+                      as.character(x_labs$species_cluster))
+
+p_4f <- ggplot(cluster_monkies_primate,
+               aes(x = factor(species_cluster), y = tr_pLDDT, fill = factor(species_cluster))) +
+  ggdist::stat_halfeye(side = "left", adjust = 0.8, width = 0.6, justification = 1.1, slab_alpha = 0.9) +
+  ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.5, size = 0.2, width = 0.4, quantiles = 1000) +
+  scale_x_discrete(labels = x_lab_vec) +
+  scale_fill_manual(values = pal_purple) +
+  labs(x = "Last species cluster with TE", y = "Human TE disorder (1 - pLDDT)") +
+  stat_compare_means(comparisons = cmp_mk_lm, method = "wilcox.test", label = "p.signif",
+                     hide.ns = FALSE, p.adjust.method = "BH", method.args = list(exact = FALSE)) +
+  theme_classic() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20), axis.text.x = element_text(size = 10))
+p_4f
+save_fig(p_4f, "fig_4f", "section4", svg = FALSE)  # heavy
+
+cmp_dat <- cluster_monkies_primate %>% mutate(species_cluster = droplevels(factor(species_cluster))) %>% ungroup()
+stat_4f <- cmp_dat %>%
+  wilcox_test(tr_pLDDT ~ species_cluster, p.adjust.method = "BH") %>% add_significance("p.adj") %>%
+  left_join(cmp_dat %>% wilcox_effsize(tr_pLDDT ~ species_cluster) %>%
+              select(group1, group2, effsize, magnitude), by = c("group1", "group2")) %>%
+  transmute(figure_panel = "4f", comparison = paste(group1, "vs", group2),
+            test = "Mann-Whitney U", n_unit = "positions", n1, n2, p, p.adj, p.adj.signif,
+            correction = "BH", effsize_r = effsize, magnitude, predictor = "AF 1-pLDDT")
+stat_4f
+
+mm_4f <- cluster_monkies_primate %>% group_by(species_cluster) %>%
+  summarise(mean = mean(tr_pLDDT), median = median(tr_pLDDT), n = n(), .groups = "drop") %>%
+  transmute(figure_panel = "4f", group = as.character(species_cluster), predictor = "AF 1-pLDDT", mean, median, n)
+mm_4f
+```
+
+# ============================================================
+# SUPPLEMENTARY TABLE 13 — all stats  |  TABLE 14 — means/medians
+# ============================================================
+
+```{r supplementary-table-13-stats}
+stats_all <- bind_rows(
+  stat_2b, stat_rsa, stat_punch,
+  stat_2d, stat_ED2d, stat_ED2e,
+  stat_2f, stat_2e, stat_2g,
+  stat_2i, stat_ED3b, stat_ED3c, stat_ED3d,
+  stat_3b, stat_3c, stat_3d, stat_3e, stat_3f, stat_3g, stat_3h,
+  stat_4d, stat_ED5a, stat_4f
+) %>%
+  relocate(figure_panel, facet_class, comparison, side, distance,
+           test, predictor, n_unit, n1, n2, effsize_r, magnitude,
+           p, p.adj, p.adj.signif, correction) %>%
+  dplyr::select(-magnitude)
+
+stats_all
+write_csv(stats_all, "../suppl_tables/supplementary_table_13.csv")
+```
+
+```{r supplementary-table-14-means-medians}
+means_medians_all <- bind_rows(
+  mm_2b, mm_rsa, mm_punch,
+  mm_2d, mm_ED2d, mm_ED2e,
+  mm_2f, mm_2e, mm_2g, mm_2i,
+  mm_ED3b, mm_ED3c, mm_ED3d, mm_ED5d_len,
+  mm_3b, mm_3c, mm_3d, mm_3e, mm_3f, mm_3g, mm_3h,
+  mm_4d, mm_ED5a, mm_4f
+) %>%
+  relocate(figure_panel, group, predictor, mean, median, n)
+
+means_medians_all
+write_csv(means_medians_all, "../suppl_tables/supplementary_table_14.csv")
+```
