@@ -13,7 +13,7 @@ Intrinsically disordered regions (IDRs) are central contributors to protein func
 
 ---
 <img src="repo_header.png" width="700"/>
----
+
 
 
 ## Repository structure
