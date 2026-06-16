@@ -63,6 +63,33 @@ wget https://zenodo.org/records/20648235/files/supplementary_table_6.csv
 
 ---
 
+## Supplementary Tables
+
+| File | Location | Paper section | Figure | Description |
+|------|----------|--------------|--------|-------------|
+| `supplementary_table_1.csv` | Repo | Prediction of TE insertions | Fig. 1c | TE insertions overlapping exonic regions |
+| `supplementary_table_2.csv` | Repo | Prediction of TE insertions | Fig. 1d | TE insertions in CDS — transcript-level dataset |
+| `supplementary_table_3.csv` | Repo | Prediction of TE insertions | Fig. 1e, ED Fig. 1e | Strand bias per TE class |
+| `supplementary_table_4.csv` | Repo | Prediction of TE insertions | — | Primate-specific TE entries (hand-curated) |
+| `supplementary_table_5.csv` | Repo | TE insertions enriched in disorder | Fig. 2a | Benchmarking results — ROC/AUC per predictor |
+| `SVA_unique_ENSTs.tsv` | Repo | Prediction of TE insertions | — | SVA unique transcript identifiers |
+| `supplementary_table_6.csv` | Zenodo | TE insertions enriched in disorder | Fig. 2b | Canonical proteins and isoforms partition |
+| `supplementary_table_7.csv` | Zenodo | TE insertions enriched in disorder | Fig. 2d | Position-specific disorder — TE vs non-TE regions |
+| `supplementary_table_8.csv` | Zenodo | Compositional determinants | Fig. 3b | GC content per TE family |
+| `supplementary_table_9.csv` | Zenodo | Compositional determinants | Fig. 3c | GC content — LINE and DNA fragments |
+| `supplementary_table_10.csv` | Zenodo | Disorder transits to order with age | Fig. 4b | Kimura divergence / insertion age estimates |
+| `supplementary_table_11.csv` | Zenodo | Disorder transits to order with age | Fig. 4c | Robust Z-scores per CDS insertion |
+| `supplementary_table_12.csv` | Zenodo | Disorder transits to order with age | Fig. 4f | Orthology conservation — disorder per Primate clade |
+| `supplementary_table_13.csv` | Zenodo | TE insertions enriched in disorder | Fig. 2b | Full statistics — p-values, effect sizes (r), means, medians |
+| `supplementary_table_14.csv` | Zenodo | TE insertions enriched in disorder | Fig. 2b | Full statistics — p-values, effect sizes (r), means, medians |
+| `supplementary_table_15.csv` | Zenodo | Expression profiles | Fig. 5a | Global expression — TE-containing vs TE-free isoforms |
+| `supplementary_table_16.csv` | Zenodo | Expression profiles | Fig. 5c | Within-gene matched set — 136 genes, expression hierarchy |
+| `supplementary_table_17.csv` | Zenodo | Expression profiles | Fig. 5d | Disorder content — whole isoform lengths |
+| `supplementary_table_18.csv` | Zenodo | Expression profiles | Fig. 5e | Disorder — Primate vs Pre-Primate TE fragments |
+| `supplementary_table_19.csv` | Zenodo | Expression profiles | ED Fig. 7a–b | MaxEntScan splice-site scores |
+| `supplementary_table_20.csv` | Zenodo | Expression profiles | ED Fig. 7c–d | HEXplorer (HZEI) scores |
+
+---
 ## Figures
 
 ### Main figures
