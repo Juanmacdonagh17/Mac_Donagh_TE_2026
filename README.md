@@ -12,7 +12,7 @@ Universidad Nacional de Quilmes · CONICET · Universidad Nacional de Córdoba �
 Intrinsically disordered regions (IDRs) are central contributors to protein function, evolution and human disease, yet the evolutionary routes that seed new disordered segments within pre-existing proteins are still poorly understood. Here, we systematically mapped TE-derived segments across human proteins and isoforms, and found that these insertions are strongly enriched in intrinsic disorder. Recent, Primate-specific insertions preferentially generate disordered segments, whereas older insertions more frequently occupy ordered structural contexts, revealing an age-dependent transition in the conformational state of TE-derived sequences. These findings identify TEs as a major evolutionary mechanism linking genome mobility to the emergence of new disordered conformational ensembles in the human proteome.
 
 ---
-<img src="main/figures/extended_data/extended_data_fig6.svg" viewBox="0 0 900 400" width="700"/>
+<img src="repo_header.png" width="700"/>
 ---
 
 
