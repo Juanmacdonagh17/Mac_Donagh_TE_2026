@@ -52,16 +52,6 @@ All supplementary tables and processed datasets are deposited on Zenodo:
 
 **DOI: [10.5281/zenodo.20648235](https://doi.org/10.5281/zenodo.20648235)**
 
-To download all files from the Zenodo record at once:
-
-```bash
-RECORD_ID=20648235
-curl https://zenodo.org/api/records/${RECORD_ID} \
-  | python3 -c "import sys,json; [print(f['links']['self']) for f in json.load(sys.stdin)['files']]" \
-  | wget -i -
-```
-
-Or to download a specific file directly:
 
 ```bash
 wget https://zenodo.org/records/20648235/files/supplementary_table_6.csv
@@ -107,7 +97,7 @@ Computational resources: [CCAD – Universidad Nacional de Córdoba](https://sup
 
 > Mac Donagh J, Vergesio N, Aguilar A, Nores R, Lagares A, Fornasari MS, Parisi G.
 > **Transposable elements as evolutionary substrates of protein disorder in the human proteome.**
-> *bioRxiv* (2026). DOI: [10.5281/zenodo.20648235](https://doi.org/10.5281/zenodo.20648235)
+> *bioRxiv* (2026). DOI: [10.64898/2026.06.12.731867](https://doi.org/10.64898/2026.06.12.731867)
 
 ---
 
