@@ -67,7 +67,7 @@ wget https://zenodo.org/records/20648235/files/supplementary_table_6.csv
 
 | File | Location | Paper section | Figure | Description |
 |------|----------|--------------|--------|-------------|
-| `supplementary_table_1.csv` | Repo | Prediction of TE insertions | Fig. 1c | TE insertions overlapping exonic regions |
+| `supplementary_table_1.csv` | Repo | Prediction of TE insertions | Fig. 1b | TE insertions overlapping introns  |
 | `supplementary_table_2.csv` | Repo | Prediction of TE insertions | Fig. 1d | TE insertions in CDS — transcript-level dataset |
 | `supplementary_table_3.csv` | Repo | Prediction of TE insertions | Fig. 1e, ED Fig. 1e | Strand bias per TE class |
 | `supplementary_table_4.csv` | Repo | Prediction of TE insertions | — | Primate-specific TE entries (hand-curated) |
