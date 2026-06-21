@@ -26,27 +26,27 @@
   </clipPath>
 </defs>
 <g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1MDQuMDA=)'>
-<rect x='0.000000000000064' y='0.00' width='720.00' height='504.00' style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />
-<rect x='71.13' y='22.77' width='643.39' height='451.11' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
-<rect x='144.25' y='90.29' width='204.71' height='375.53' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #A68BC2;' />
-<rect x='436.69' y='373.11' width='204.71' height='92.71' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #5C9E9E;' />
-<text x='246.60' y='79.33' text-anchor='middle' style='font-size: 39.83px; font-family: "Liberation Sans";' textLength='88.62px' lengthAdjust='spacingAndGlyphs'>5128</text>
-<text x='539.05' y='362.15' text-anchor='middle' style='font-size: 39.83px; font-family: "Liberation Sans";' textLength='88.62px' lengthAdjust='spacingAndGlyphs'>1266</text>
-<polyline points='71.13,473.88 71.13,22.77 ' style='stroke-width: 1.07; stroke-linecap: square;' />
-<text x='66.20' y='472.01' text-anchor='end' style='font-size: 18.00px; font-family: "Liberation Sans";' textLength='10.02px' lengthAdjust='spacingAndGlyphs'>0</text>
-<text x='66.20' y='325.55' text-anchor='end' style='font-size: 18.00px; font-family: "Liberation Sans";' textLength='40.06px' lengthAdjust='spacingAndGlyphs'>2000</text>
-<text x='66.20' y='179.08' text-anchor='end' style='font-size: 18.00px; font-family: "Liberation Sans";' textLength='40.06px' lengthAdjust='spacingAndGlyphs'>4000</text>
-<text x='66.20' y='32.62' text-anchor='end' style='font-size: 18.00px; font-family: "Liberation Sans";' textLength='40.06px' lengthAdjust='spacingAndGlyphs'>6000</text>
-<polyline points='68.39,465.82 71.13,465.82 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
-<polyline points='68.39,319.36 71.13,319.36 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
-<polyline points='68.39,172.89 71.13,172.89 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
-<polyline points='68.39,26.43 71.13,26.43 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
-<polyline points='71.13,473.88 714.52,473.88 ' style='stroke-width: 1.07; stroke-linecap: square;' />
-<polyline points='246.60,476.62 246.60,473.88 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
-<polyline points='539.05,476.62 539.05,473.88 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
-<text x='246.60' y='493.95' text-anchor='middle' style='font-size: 22.00px; font-family: "Liberation Sans";' textLength='182.22px' lengthAdjust='spacingAndGlyphs'>Canonical proteins</text>
-<text x='539.05' y='493.95' text-anchor='middle' style='font-size: 22.00px; font-family: "Liberation Sans";' textLength='84.34px' lengthAdjust='spacingAndGlyphs'>Isoforms</text>
-<text transform='translate(19.25,248.32) rotate(-90)' text-anchor='middle' style='font-size: 20.00px; font-family: "Liberation Sans";' textLength='71.12px' lengthAdjust='spacingAndGlyphs'>Number</text>
+<rect x='0.00' y='0.00' width='720.00' height='504.00' style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />
+<rect x='91.61' y='22.77' width='622.91' height='449.32' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
+<rect x='162.40' y='90.02' width='198.20' height='374.05' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #A68BC2;' />
+<rect x='445.54' y='371.72' width='198.20' height='92.34' style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #5C9E9E;' />
+<text x='261.50' y='79.06' text-anchor='middle' style='font-size: 39.83px; font-family: "Liberation Sans";' textLength='88.62px' lengthAdjust='spacingAndGlyphs'>5128</text>
+<text x='544.64' y='360.76' text-anchor='middle' style='font-size: 39.83px; font-family: "Liberation Sans";' textLength='88.62px' lengthAdjust='spacingAndGlyphs'>1266</text>
+<polyline points='91.61,472.09 91.61,22.77 ' style='stroke-width: 1.07; stroke-linecap: square;' />
+<text x='86.68' y='472.32' text-anchor='end' style='font-size: 24.00px; font-family: "Liberation Sans";' textLength='13.34px' lengthAdjust='spacingAndGlyphs'>0</text>
+<text x='86.68' y='326.44' text-anchor='end' style='font-size: 24.00px; font-family: "Liberation Sans";' textLength='53.38px' lengthAdjust='spacingAndGlyphs'>2000</text>
+<text x='86.68' y='180.56' text-anchor='end' style='font-size: 24.00px; font-family: "Liberation Sans";' textLength='53.38px' lengthAdjust='spacingAndGlyphs'>4000</text>
+<text x='86.68' y='34.67' text-anchor='end' style='font-size: 24.00px; font-family: "Liberation Sans";' textLength='53.38px' lengthAdjust='spacingAndGlyphs'>6000</text>
+<polyline points='88.87,464.07 91.61,464.07 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
+<polyline points='88.87,318.18 91.61,318.18 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
+<polyline points='88.87,172.30 91.61,172.30 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
+<polyline points='88.87,26.41 91.61,26.41 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
+<polyline points='91.61,472.09 714.52,472.09 ' style='stroke-width: 1.07; stroke-linecap: square;' />
+<polyline points='261.50,474.83 261.50,472.09 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
+<polyline points='544.64,474.83 544.64,472.09 ' style='stroke-width: 1.07; stroke-linecap: butt;' />
+<text x='261.50' y='493.54' text-anchor='middle' style='font-size: 24.00px; font-family: "Liberation Sans";' textLength='198.75px' lengthAdjust='spacingAndGlyphs'>Canonical proteins</text>
+<text x='544.64' y='493.54' text-anchor='middle' style='font-size: 24.00px; font-family: "Liberation Sans";' textLength='92.03px' lengthAdjust='spacingAndGlyphs'>Isoforms</text>
+<text transform='translate(24.75,247.43) rotate(-90)' text-anchor='middle' style='font-size: 28.00px; font-family: "Liberation Sans";' textLength='99.61px' lengthAdjust='spacingAndGlyphs'>Number</text>
 </g>
 </g>
 </svg>
