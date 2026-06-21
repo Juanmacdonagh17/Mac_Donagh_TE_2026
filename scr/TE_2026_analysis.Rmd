@@ -35,8 +35,8 @@ custom_palette2 <- c(te_general_color, isoform_no_te_color, no_te_color)
 # DRY figure saver. PNG always; SVG only when svg = TRUE (skip for heavy
 # halfeye / density / dot panels whose vector output is enormous).
 # `name` is the file stem (e.g. "fig_1a", "edf_2d"); `section` is the subfolder.
-save_fig <- function(plot, name, section, svg = TRUE,
-                     width = 10, height = 7, dpi = 320) {
+save_fig <- function(plot, name, section, svg = TRUE, pdf = FALSE,
+                     width = 2.4, height = 2.0, dpi = 320) {
   dir <- file.path("../plots", section)
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   ggsave(file.path(dir, paste0(name, ".png")), plot = plot,
@@ -46,6 +46,11 @@ save_fig <- function(plot, name, section, svg = TRUE,
     ggsave(file.path(dir, paste0(name, ".svg")), plot = plot,
            width = width, height = height, units = "in",
            device = "svg", bg = "white")
+  }
+  if (pdf) {
+    ggsave(file.path(dir, paste0(name, ".pdf")), plot = plot,
+           width = width, height = height, units = "in",
+           device = "pdf", bg = "white")
   }
   invisible(plot)
 }
@@ -66,76 +71,33 @@ df_genes <- df1 %>%
   mutate(category = factor(category, levels = category)) %>%
   dplyr::select(category, n, pct)
 
-genes_palette <- c("With TE" = "#674ea7", "Without TE" = "#808080")
+genes_palette <- c("With coding TEs" = "#674ea7", "Without coding TEs" = "#808080")
 
 p_1a <- ggplot(
   df_genes |> mutate(category_2 = factor(category,
-    levels = c("With TE", "Without TE"),
-    labels = c("Genes\nwith TE", "Genes\nwithout TE"))),
+    levels = c("With coding TEs", "Without coding TEs"),
+    labels = c("Genes\nwith coding TEs", "Genes\nwithout coding TEs"))),
   aes(x = category_2, y = pct, color = category, fill = category)) +
   geom_bar(stat = "identity", linewidth = 1.8, width = 0.5) +
-  geom_text(aes(label = sprintf("%.2f%%", pct)), vjust = -0.3, size = 10, color = "black") +
+  geom_text(aes(label = sprintf("%.2f%%", pct)), vjust = -0.3, size = 2.8, color = "black") +
   scale_color_manual(values = genes_palette) +
   scale_fill_manual(values = genes_palette) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100),
                      breaks = c(0, 25, 50, 75, 100), labels = scales::percent_format(scale = 1)) +
   coord_cartesian(clip = "off") +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), legend.position = "none") +
   labs(title = "", x = "", y = "Percentage (%)")
 p_1a
-save_fig(p_1a, "fig_1a", "section1")
+save_fig(p_1a, "fig_1a", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
 ```
 
 ```{r fig_1b}
-#### Fig 1b — exon vs intron TE content ####
-main_type_summary_2 <- df1 %>%
-  filter(panel == "exon_intron") %>%
-  transmute(type_2 = factor(category, levels = c("Exons with TE", "Introns with TE")), pct_2 = pct)
-
-exon_intron_palette <- c("Exons with TE" = "#674ea7", "Introns with TE" = "#D38DDB")
-
-p_1b <- ggplot(main_type_summary_2, aes(x = type_2, y = pct_2, color = type_2, fill = type_2)) +
-  geom_bar(stat = "identity", linewidth = 1.8, width = 0.5) +
-  scale_color_manual(values = exon_intron_palette) +
-  scale_fill_manual(values = exon_intron_palette) +
-  geom_text(aes(label = sprintf("%.2f%%", pct_2)), vjust = -0.3, size = 10, color = "black") +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100),
-                     labels = scales::percent_format(scale = 1)) +
-  coord_cartesian(clip = "off") +
-  theme_classic() +
-  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20), legend.position = "none") +
-  labs(title = "", x = "", y = "Percentage (%)")
-p_1b
-save_fig(p_1b, "fig_1b", "section1")
+# NV script!
 ```
 
-```{r fig_1c}
-#### Fig 1c — transcript-region distribution (5'UTR / CDS / 3'UTR) ####
-exon_detail_summary_2 <- df1 %>%
-  filter(panel == "exon_detail") %>%
-  mutate(exon_detail = factor(category, levels = category)) %>%
-  dplyr::select(exon_detail, n, pct) %>%
-  mutate(exon_detail = fct_recode(exon_detail, "5'UTR" = "UTR5", "3'UTR" = "UTR3") %>%
-           fct_relevel("5'UTR", "CDS", "3'UTR"))
 
-p_1c <- ggplot(exon_detail_summary_2, aes(x = exon_detail, y = pct, color = exon_detail, fill = exon_detail)) +
-  geom_bar(stat = "identity", linewidth = 1.6, width = 0.6) +
-  geom_text(aes(label = paste0(round(pct, 2), "%")), vjust = -0.3, size = 10, color = "black") +
-  scale_color_manual(values = c("5'UTR" = "#4A90D9", "CDS" = "#674ea7", "3'UTR" = "#E06C3A")) +
-  scale_fill_manual(values = c("5'UTR" = "#4A90D9", "CDS" = "#674ea7", "3'UTR" = "#E06C3A")) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.1)), limits = c(0, 100),
-                     labels = scales::percent_format(scale = 1)) +
-  coord_cartesian(clip = "off") +
-  theme_classic() +
-  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20), legend.position = "none") +
-  labs(title = "", x = "", y = "Percentage (%)")
-p_1c
-save_fig(p_1c, "fig_1c", "section1")
-```
 
 ```{r load-df2}
 df2 <- read.csv("../data/supplementary_table_2.csv")
@@ -152,20 +114,112 @@ p_edf1a <- ggplot(plot1, aes(x = e_value, fill = source)) +
   scale_x_log10() +
   scale_fill_manual(values = c("RepeatMasker" = "#9DD1E9", "HMM retrieved" = "#DA3948")) +
   coord_cartesian(xlim = c(NA, 0.1)) +
-  geom_vline(xintercept = 1e-2, linetype = "dashed", color = "red") +
+  # geom_vline(xintercept = 1e-2, linetype = "dashed", color = "red") +
   labs(x = "e-value (log10 scale)", y = "Number") +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 10), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
         legend.position = c(0.0101, 1), legend.justification = c("left", "top"),
-        legend.title = element_text(size = 0), legend.text = element_text(size = 20))
+        legend.title = element_text(size = 0), legend.text = element_text(size = 6))
 p_edf1a
-save_fig(p_edf1a, "edf_1a", "section1")
+save_fig(p_edf1a, "edf_1a", "section1", pdf = TRUE, svg = FALSE, width = 2.6, height = 2.0)
 ```
 
 ```{r load-df3}
 df3 <- read.csv("../data/supplementary_table_3.csv")
 ```
+
+
+
+```{r}
+biomart_exons <- read.csv("../data/exon_data.csv") # biomart mapping data
+
+```
+
+
+```{r}
+df3_exons <- df3 %>% mutate(target_name_unversioned = sub("\\..*$", "", target_name))
+
+biomart_exons %>% dplyr::select(ensembl_transcript_id) %>% distinct() %>% filter(ensembl_transcript_id %in% df3_exons$target_name_unversioned)
+
+```
+
+
+```{r}
+
+# Deduplicate biomart_exons to unique exon loci
+biomart_exons_unique <- biomart_exons %>%
+  distinct(ensembl_exon_id, .keep_all = TRUE)
+
+total_unique_exons <- nrow(biomart_exons_unique)
+
+# Join and flag overlaps
+exon_te <- biomart_exons_unique %>%
+  left_join(df3_exons, by = c("ensembl_transcript_id" = "target_name_unversioned")) %>%
+  mutate(has_te = !is.na(start_aa) &
+           aa_start <= end_aa &
+           aa_end >= start_aa)
+exon_te
+# Collapse to unique exons
+exon_unique <- exon_te %>%
+  group_by(ensembl_exon_id) %>%
+  summarise(has_te = any(has_te), .groups = "drop") %>%
+  filter(!is.na(has_te))
+exon_unique
+# Summary
+exon_summary <- exon_unique %>%
+  summarise(
+    total_exons = total_unique_exons,
+    exons_with_te = sum(has_te),
+    exons_without_te = sum(!has_te),
+    pct_with_te = 100 * exons_with_te / total_exons,
+    pct_without_te = 100 * exons_without_te / total_exons
+  )
+
+exon_summary
+```
+```{r fig_1c}
+#### Fig 1c — exon / TE distribution ####
+
+exon_long <- exon_summary %>%
+
+  pivot_longer(
+    cols = c(pct_with_te, pct_without_te), 
+    names_to = "category", 
+    values_to = "pct"
+  ) %>%
+
+  mutate(category = case_when(
+    category == "pct_with_te" ~ "Exons with TEs",
+    category == "pct_without_te" ~ "Exons without TEs"
+  ))
+
+
+p_1c <- ggplot(exon_long, aes(x = category, y = pct, color = category, fill = category)) +
+  geom_bar(stat = "identity", linewidth = 1.6, width = 0.6) +
+
+  geom_text(aes(label = paste0(round(pct, 1), "%")), 
+            vjust = -0.5, size = 2.8, color = "black") +
+
+  scale_color_manual(values = c("Exons with TEs" = "#674ea7", "Exons without TEs" = "#808080")) +
+  scale_fill_manual(values = c("Exons with TEs" = "#674ea7", "Exons without TEs" = "#808080")) +
+  
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)), 
+                     limits = c(0, 100), 
+                     labels = function(x) paste0(x, "%")) +
+  coord_cartesian(clip = "off") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 7), 
+        axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), 
+        legend.position = "none") +
+  labs(title = "", x = "", y = "Percentage (%)")
+
+p_1c
+save_fig(p_1c, "fig_1b", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
+# save_fig(p_1c, "fig_1c", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
+```
+
 
 ```{r fig_1d}
 #### Fig 1d — unique genes / transcripts / insertions ####
@@ -178,14 +232,14 @@ plot2 <- tibble::tibble(
 
 p_1d <- ggplot() +
   geom_col(data = plot2, aes(stage, count), fill = "#327e45", width = 0.7) +
-  geom_text(data = plot2, aes(stage, count, label = count), vjust = -0.3, size = 14) +
+  geom_text(data = plot2, aes(stage, count, label = count), vjust = -0.3, size = 2.8) +
   labs(x = NULL, y = "Number", fill = NULL, title = "") +
   coord_cartesian(ylim = c(NA, 7500), clip = "off") +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20))
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8))
 p_1d
-save_fig(p_1d, "fig_1d", "section1")
+save_fig(p_1d, "fig_1d", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
 ```
 
 ```{r edf_1b}
@@ -201,10 +255,10 @@ p_edf1b <- ggplot(plot2_df, aes(x = n_dfam)) +
   scale_x_continuous(breaks = function(x) seq(floor(min(x)), ceiling(max(x)), by = 1)) +
   labs(x = "Number of TE insertions per protein", y = "Percentage (%)") +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20))
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8))
 p_edf1b
-save_fig(p_edf1b, "edf_1b", "section1")
+save_fig(p_edf1b, "edf_1b", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
 ```
 
 ```{r fig_1e}
@@ -218,16 +272,20 @@ plot5_df <- data.frame(
 
 p_1e <- ggplot(plot5_df, aes(x = stage, y = count, fill = stage)) +
   geom_col(width = 0.7) +
-  geom_text(aes(label = count, y = count), vjust = -0.4, size = 14, show.legend = FALSE) +
+  geom_text(aes(label = count, y = count), vjust = -0.4, size = 2.8, show.legend = FALSE) +
   scale_fill_manual(values = c("Canonical proteins" = "#A68BC2", "Isoforms" = "#5C9E9E")) +
   scale_y_continuous(expand = expansion(mult = c(0.02, 0.10))) +
   labs(x = NULL, y = "Number", title = "") +
   coord_cartesian(ylim = c(NA, 5500), clip = "off") +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 22), axis.text.y = element_text(size = 18),
-        axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(
+    axis.text.x  = element_text(size = 7),
+    axis.text.y  = element_text(size = 7),
+    axis.title.y = element_text(size = 8),
+    legend.position = "none"
+  )
 p_1e
-save_fig(p_1e, "fig_1e", "section1")
+save_fig(p_1e, "fig_1e", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
 ```
 
 ```{r edf_1c}
@@ -242,10 +300,10 @@ p_edf1c <- ggplot(plot3_df, aes(x = length_te)) +
   coord_cartesian(xlim = c(NA, 400)) +
   labs(x = "TE insertion length (aa)", y = "Number") +
   theme_classic() +
-  theme(axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),
-        axis.text = element_text(size = 18))
+  theme(axis.title = element_text(size = 8),
+        axis.text = element_text(size = 7))
 p_edf1c
-save_fig(p_edf1c, "edf_1c", "section1")
+save_fig(p_edf1c, "edf_1c", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
 ```
 
 ```{r edf_1d}
@@ -257,10 +315,10 @@ p_edf1d <- ggplot(df3, aes(x = n_exons)) +
   labs(title = "", x = "Number of exons per TE insertion", y = "Percentage (%)") +
   coord_cartesian(xlim = c(NA, 12)) +
   theme_classic() +
-  theme(axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),
-        axis.text = element_text(size = 18))
+  theme(axis.title = element_text(size = 8),
+        axis.text = element_text(size = 7))
 p_edf1d
-save_fig(p_edf1d, "edf_1d", "section1")
+save_fig(p_edf1d, "edf_1d", "section1", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.0)
 ```
 
 ```{r fig_1f}
@@ -274,7 +332,7 @@ df_rep_pct <- df_rep %>% mutate(pct = 100 * n / sum(n))
 p_1f <- ggplot(df_rep_pct, aes(x = pct, y = repeat_type_name, fill = repeat_type_name)) +
   geom_col(position = position_dodge(width = 0.75), width = 0.7) +
   geom_text(aes(label = paste0(round(pct, 2), "%")), position = position_dodge(width = 0.75),
-            hjust = -0.2, size = 8) +
+            hjust = -0.2, size = 2.8) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A",
                                "SINE" = "#3D6446", "LTR" = "#4A6A8A", "PLE" = "#8A6A2A",
                                "RC" = "#2A4A6A", "RNA" = "#6A8A4A", "Satellite" = "#8A4A6A",
@@ -282,11 +340,11 @@ p_1f <- ggplot(df_rep_pct, aes(x = pct, y = repeat_type_name, fill = repeat_type
   labs(x = "Percentage", y = NULL, title = "") +
   coord_cartesian(xlim = c(NA, 35)) +
   theme_classic() +
-  theme(axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 16),
-        axis.text.y = element_text(size = 18), legend.title = element_blank(),
-        legend.text = element_text(size = 12), legend.position = "none")
+  theme(axis.title.x = element_text(size = 8), axis.text.x = element_text(size = 7),
+        axis.text.y = element_text(size = 7), legend.title = element_blank(),
+        legend.text = element_text(size = 6), legend.position = "none")
 p_1f
-save_fig(p_1f, "fig_1f", "section1")
+save_fig(p_1f, "fig_1f", "section1", pdf = TRUE, svg = FALSE, width = 3.4, height = 3.0)
 ```
 
 # ============================================================
@@ -314,7 +372,7 @@ roc_punch   <- pROC::roc(response = df_roc_D$flag, predictor = df_roc_D$punch)
 roc_list <- list("AF - RSA" = roc_af_rsa, "1 - pLDDT" = roc_plddt, "spotds" = roc_spot,
                  "AIUPred" = roc_aiupred, "PUNCH 2-light" = roc_punch)
 labels <- c(
-  "AF - RSA"      = paste0("pLDDT-RSA (25) (AUC = ", round(pROC::auc(roc_af_rsa), 3), ")"),
+  "AF - RSA"      = paste0("pLDDT-RSA (AUC = ", round(pROC::auc(roc_af_rsa), 3), ")"),
   "1 - pLDDT"     = paste0("1-pLDDT (AUC = ", round(pROC::auc(roc_plddt), 3), ")"),
   "spotds"        = paste0("spotds (AUC = ", round(pROC::auc(roc_spot), 3), ")"),
   "AIUPred"       = paste0("AIUPred (AUC = ", round(pROC::auc(roc_aiupred), 3), ")"),
@@ -327,9 +385,16 @@ p_2a <- pROC::ggroc(roc_list, legacy.axes = TRUE) +
                                 "PUNCH 2-light" = "#A97369"),
                      labels = labels, name = NULL) +
   labs(x = "1 - Specificity", y = "Sensitivity", title = "") +
-  theme_minimal()
+  theme_classic() +
+  theme(axis.title = element_text(size = 8), axis.text = element_text(size = 7),
+        legend.text = element_text(size = 6), legend.title = element_blank(),
+ legend.position = c(0.77, 0.35),
+   
+    legend.background = element_rect(fill = alpha("white", 0.1), colour = NA), 
+    legend.key = element_blank()
+  )
 p_2a
-save_fig(p_2a, "fig_2a", "section2")
+save_fig(p_2a, "fig_2a", "section2", pdf = TRUE, svg = FALSE, width = 3.6, height = 2.6)
 ```
 
 ```{r load-df6}
@@ -352,14 +417,14 @@ p_2b <- ggplot(df_1_plddt, aes(x = type, y = mean_disorder, fill = type, color =
   ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.10, size = 0.9, width = 0.4) +
   scale_fill_manual(values = fill_vals) + scale_color_manual(values = fill_vals) +
   stat_compare_means(comparisons = cmp2b, method = "wilcox.test", label = "p.signif",
-                     hide.ns = TRUE, p.adjust = "BH", method.args = list(exact = FALSE)) +
+                     hide.ns = TRUE, p.adjust = "BH", size = 2.5, method.args = list(exact = FALSE)) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5),
-        axis.title.y = element_text(size = 20),
+  theme(axis.text.x = element_text(size = 6, angle = 0, hjust = 0.5),
+        axis.title.y = element_text(size = 8),
         legend.position = "none") +
   labs(x = NULL, y = "Mean protein disorder (1 - pLDDT)", title = "")
 p_2b
-save_fig(p_2b, "fig_2b", "section2", svg = FALSE)  # heavy
+save_fig(p_2b, "fig_2b", "section2", svg = FALSE, width = 3.2, height = 3.2)  # heavy
 
 df_1_plddt <- df_1_plddt %>% ungroup()
 stat_2b <- df_1_plddt %>%
@@ -387,15 +452,15 @@ cmp_rsa <- combn(levels(df_rsa$type), 2, simplify = FALSE)
 p_edf2a <- ggplot(df_rsa, aes(x = type, y = mean_disorder25, fill = type)) +
   geom_boxplot() + scale_fill_manual(values = fill_vals) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5),
-        axis.title.y = element_text(size = 20),
+  theme(axis.text.x = element_text(size = 6, angle = 0, hjust = 0.5),
+        axis.title.y = element_text(size = 8),
         legend.position = "none") +
     
   labs(x = NULL, y = "Mean protein disorder (AF - RSA)", title = "") +
   stat_compare_means(comparisons = cmp_rsa, method = "wilcox.test", label = "p.signif",
-                     hide.ns = TRUE, p.adjust = "BH", method.args = list(exact = FALSE))
+                     hide.ns = TRUE, p.adjust = "BH", size = 2.5, method.args = list(exact = FALSE))
 p_edf2a
-save_fig(p_edf2a, "edf_2a", "section2")
+save_fig(p_edf2a, "edf_2a", "section2", pdf = TRUE, svg = FALSE, width = 2.8, height = 2.8)
 
 df_rsa <- df_rsa %>% ungroup()
 stat_rsa <- df_rsa %>%
@@ -421,14 +486,14 @@ cmp_punch <- combn(levels(df_punch$type), 2, simplify = FALSE)
 p_edf2b <- ggplot(df_punch, aes(x = type, y = mean_punch, fill = type)) +
   geom_boxplot() + scale_fill_manual(values = fill_vals) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5),
-        axis.title.y = element_text(size = 20),
+  theme(axis.text.x = element_text(size = 6, angle = 0, hjust = 0.5),
+        axis.title.y = element_text(size = 8),
         legend.position = "none") +
   labs(x = NULL, y = "Mean protein disorder (PUNCH 2-light)", title = "") +
   stat_compare_means(comparisons = cmp_punch, method = "wilcox.test", label = "p.signif",
-                     hide.ns = TRUE, p.adjust = "BH", method.args = list(exact = FALSE))
+                     hide.ns = TRUE, p.adjust = "BH", size = 2.5, method.args = list(exact = FALSE))
 p_edf2b
-save_fig(p_edf2b, "edf_2b", "section2")
+save_fig(p_edf2b, "edf_2b", "section2", pdf = TRUE, svg = FALSE, width = 2.8, height = 2.8)
 
 df_punch <- df_punch %>% ungroup()
 stat_punch <- df_punch %>%
@@ -468,15 +533,15 @@ counts_lab <- df_bin %>%
 p_2c <- ggplot(counts_lab, aes(x = type, y = n, fill = type_disorder)) +
   geom_col(position = "fill", color = "black") +
   geom_text(aes(label = scales::percent(frac, accuracy = 1)),
-            position = position_fill(vjust = 0.5), size = 4, color = "white") +
+            position = position_fill(vjust = 0.5), size = 2.2, color = "white") +
   scale_y_continuous(labels = scales::percent) +
   labs(x = NULL, y = "Percentage (%)", fill = "Category:", title = "") +
   scale_fill_manual(values = c("Highly ordered" = custom_palette[1], "Ordered" = custom_palette[2],
                                "Highly disordered" = custom_palette[4], "IDP" = custom_palette[3])) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 15, angle = 0, hjust = 0.5), axis.title.y = element_text(size = 20), legend.position = "top")
+  theme(axis.text.x = element_text(size = 7, angle = 10, hjust = 1), axis.title.y = element_text(size = 8), legend.position = "none")
 p_2c
-save_fig(p_2c, "fig_2c", "section2")
+save_fig(p_2c, "fig_2c", "section2", pdf = TRUE, svg = FALSE, width = 2.8, height = 2.6)
 ```
 
 ```{r edf_2c}
@@ -489,16 +554,16 @@ plot_df <- df6 %>%
 
 p_edf2c <- ggplot(plot_df, aes(x = "", y = pct, fill = type)) +
   geom_col(width = 0.6) +
-  geom_text(aes(label = round(pct, 2)), position = position_stack(vjust = 0.5), size = 5, color = "black") +
-  geom_text(aes(label = type, x = 1.6), position = position_stack(vjust = 0.5), size = 5, color = "black") +
+  geom_text(aes(label = round(pct, 2)), position = position_stack(vjust = 0.5), size = 2.5, color = "black") +
+  # geom_text(aes(label = type, x = 1.6), position = position_stack(vjust = 0.5), size = 2.5, color = "black") +
   scale_fill_manual(values = fill_vals) +
   labs(y = "% of IDPs (1 - pLDDT)", x = "", title = "") +
   theme_classic() +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
-        axis.title.y = element_text(size = 20), legend.position = "none") +
+        axis.title.y = element_text(size = 8), legend.position = "none") +
   coord_cartesian(xlim = c(0.7, 1.45), clip = "off")
 p_edf2c
-save_fig(p_edf2c, "edf_2c", "section2")
+save_fig(p_edf2c, "edf_2c", "section2", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.4)
 ```
 
 ```{r load-df7}
@@ -514,12 +579,12 @@ p_2d <- ggplot(df7, aes(x = tr, y = X1_plddt, fill = tr)) +
   ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.5, size = 0.2, width = 0.4, quantiles = 1000) +
   scale_fill_manual(values = c(non_te_region, te_general_color)) +
   labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "") +
-  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 2.5) +
   scale_x_discrete(labels = c(TR_region = "TE region", no_TR_region = "Non TE region")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(size = 7), axis.title.y = element_text(size = 8), legend.position = "none")
 p_2d
-save_fig(p_2d, "fig_2d", "section2", svg = FALSE)  # heavy
+save_fig(p_2d, "fig_2d", "section2", svg = FALSE, width = 2.6, height = 2.6)  # heavy
 
 df7 <- df7 %>% ungroup()
 stat_2d <- df7 %>%
@@ -544,12 +609,12 @@ mm_2d
 p_edf2d <- ggplot(df7, aes(x = tr, y = af_rsa, fill = tr)) +
   geom_boxplot() + scale_fill_manual(values = c(non_te_region, te_general_color)) +
   labs(x = NULL, y = "Disorder (AF - RSA)", title = "") +
-  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 2.5) +
   scale_x_discrete(labels = c(TR_region = "TE region", no_TR_region = "Non TE region")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(size = 7), axis.title.y = element_text(size = 8), legend.position = "none")
 p_edf2d
-save_fig(p_edf2d, "edf_2d", "section2")
+save_fig(p_edf2d, "edf_2d", "section2", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.2)
 
 stat_ED2d <- df7 %>%
   wilcox_test(af_rsa ~ tr) %>% add_significance("p") %>%
@@ -573,12 +638,12 @@ mm_ED2d
 p_edf2e <- ggplot(df7, aes(x = tr, y = punch, fill = tr)) +
   geom_boxplot() + scale_fill_manual(values = c(non_te_region, te_general_color)) +
   labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "") +
-  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 2.5) +
   scale_x_discrete(labels = c(TR_region = "TE region", no_TR_region = "Non TE region")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(size = 7), axis.title.y = element_text(size = 8), legend.position = "none")
 p_edf2e
-save_fig(p_edf2e, "edf_2e", "section2")
+save_fig(p_edf2e, "edf_2e", "section2", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.2)
 
 stat_ED2e <- df7 %>%
   wilcox_test(punch ~ tr) %>% add_significance("p") %>%
@@ -636,12 +701,12 @@ p_2f <- ggplot(dfam_disorder_primates, aes(x = tr, y = disorder, fill = tr)) +
   ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.5, size = 0.2, width = 0.4, quantiles = 1000) +
   scale_fill_manual(values = c(non_te_region, te_general_color)) +
   labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "") +
-  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 2.5) +
   scale_x_discrete(labels = c(TR_region = "TE region (primates)", no_TR_region = "Non TE region (primates)")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(size = 7), axis.title.y = element_text(size = 8), legend.position = "none")
 p_2f
-save_fig(p_2f, "fig_2f", "section2", svg = FALSE)  # heavy
+save_fig(p_2f, "fig_2f", "section2", svg = FALSE, width = 3.0, height = 2.8)  # heavy
 
 dfam_disorder_primates <- dfam_disorder_primates %>% ungroup()
 stat_2f <- dfam_disorder_primates %>%
@@ -667,13 +732,13 @@ df_2e <- te_primates_full %>% filter(tr != "no_TR_region")
 p_2e <- ggplot(df_2e, aes(x = primates, y = disorder, fill = primates)) +
   geom_boxplot() +
   labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "") +
-  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 5) +
+  stat_compare_means(method = "wilcox.test", label = "p.signif", label.x = 1.5, label.y = 0.98, size = 2.5) +
   scale_x_discrete(labels = c(yes = "TE, Primates", no = "TE, pre primates")) +
   scale_fill_manual(values = c("yes" = custom_palette2[1], "no" = scales::alpha("#9E8BAE", 0.5))) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 16), axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(size = 7), axis.title.y = element_text(size = 8), legend.position = "none")
 p_2e
-save_fig(p_2e, "fig_2e", "section2")
+save_fig(p_2e, "fig_2e", "section2", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.2)
 
 df_2e <- df_2e %>% ungroup()
 stat_2e <- df_2e %>%
@@ -709,40 +774,43 @@ dist_primates <- dfam_disorder_primates %>% group_by(uniprot_id) %>%
   mutate(region = case_when(
     tr == "TR_region"     ~ "TE",
     dist_upstream   <= 10 ~ "Non-TE upstream 10",
-    dist_upstream   <= 25 ~ "Non-TE upstream 25",
-    dist_upstream   <= 50 ~ "Non-TE upstream 50",
-    dist_upstream   <= 75 ~ "Non-TE upstream 75",
+    dist_upstream   <= 25 ~ "N-T upstream 25",
+    dist_upstream   <= 50 ~ "N-T upstream 50",
+    dist_upstream   <= 75 ~ "N-T upstream 75",
     dist_downstream <= 10 ~ "Non-TE downstream 10",
-    dist_downstream <= 25 ~ "Non-TE downstream 25",
-    dist_downstream <= 50 ~ "Non-TE downstream 50",
-    dist_downstream <= 75 ~ "Non-TE downstream 75",
+    dist_downstream <= 25 ~ "N-T downstream 25",
+    dist_downstream <= 50 ~ "N-T downstream 50",
+    dist_downstream <= 75 ~ "N-T downstream 75",
     TRUE                  ~ NA_character_)) %>%
   filter(!is.na(region))
 
-region_levels <- c("Non-TE upstream 75", "Non-TE upstream 50", "Non-TE upstream 25", "Non-TE upstream 10",
+region_levels <- c("N-T upstream 75", "N-T upstream 50", "N-T upstream 25", "Non-TE upstream 10",
                    "TE",
-                   "Non-TE downstream 10", "Non-TE downstream 25", "Non-TE downstream 50", "Non-TE downstream 75")
+                   "Non-TE downstream 10", "N-T downstream 25", "N-T downstream 50", "N-T downstream 75")
 cmp_te <- lapply(region_levels[region_levels != "TE"], function(r) c("TE", r))
 
 p_2g <- dist_primates %>%
   mutate(region = factor(region, levels = region_levels)) %>%
   ggplot(aes(x = region, y = disorder, fill = region)) +
   geom_boxplot(outlier.shape = NA) +
-  stat_compare_means(comparisons = cmp_te, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  stat_compare_means(comparisons = cmp_te, method = "wilcox.test", label = "p.signif", hide.ns = TRUE, size = 1) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   scale_fill_manual(values = c(
-    "Non-TE upstream 75" = scales::alpha(non_te_region, 0.4), "Non-TE upstream 50" = scales::alpha(non_te_region, 0.5),
-    "Non-TE upstream 25" = scales::alpha(non_te_region, 0.7), "Non-TE upstream 10" = scales::alpha(non_te_region, 0.9),
+    "N-T upstream 75" = scales::alpha(non_te_region, 0.4), "N-T upstream 50" = scales::alpha(non_te_region, 0.5),
+    "N-T upstream 25" = scales::alpha(non_te_region, 0.7), "Non-TE upstream 10" = scales::alpha(non_te_region, 0.9),
     "TE" = te_general_color,
-    "Non-TE downstream 10" = scales::alpha(non_te_region, 0.9), "Non-TE downstream 25" = scales::alpha(non_te_region, 0.7),
-    "Non-TE downstream 50" = scales::alpha(non_te_region, 0.5), "Non-TE downstream 75" = scales::alpha(non_te_region, 0.4))) +
+    "Non-TE downstream 10" = scales::alpha(non_te_region, 0.9), "N-T downstream 25" = scales::alpha(non_te_region, 0.7),
+    "N-T downstream 50" = scales::alpha(non_te_region, 0.5), "N-T downstream 75" = scales::alpha(non_te_region, 0.4))) +
   theme_classic() +
   labs(x = NULL, y = "Disorder (1 - pLDDT)") +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 10), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 6), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), legend.position = "none")
 p_2g
-save_fig(p_2g, "fig_2g", "section2", width = 16)  # wider panel
+save_fig(p_2g, "fig_2g", "section2", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.2)  # wider panel
+```
 
+
+```{r fig_2g}
 dist_primates2 <- dist_primates %>% mutate(region = factor(region, levels = region_levels)) %>% ungroup()
 stat_2g <- dist_primates2 %>%
   wilcox_test(disorder ~ region, ref.group = "TE", p.adjust.method = "BH") %>% add_significance("p.adj") %>%
@@ -773,15 +841,15 @@ df_rep_pct2 <- df_rep2 %>% mutate(repeat_type_name = factor(repeat_type_name, le
 
 p_2g_bar <- ggplot(df_rep_pct2, aes(x = pct, y = repeat_type_name, fill = repeat_type_name)) +
   geom_col(width = 0.7) +
-  geom_text(aes(label = paste0(round(pct, 2), "%")), hjust = -0.2, size = 4) +
+  geom_text(aes(label = paste0(round(pct, 2), "%")), hjust = -0.2, size = 2.5) +
   coord_cartesian(xlim = c(NA, 100)) +
   labs(x = "Percentage", y = NULL, title = "") +
   theme_classic() +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
-  theme(axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 12),
-        axis.text.y = element_text(size = 12), legend.position = "none")
+  theme(axis.title.x = element_text(size = 8), axis.text.x = element_text(size = 7),
+        axis.text.y = element_text(size = 7), legend.position = "none")
 p_2g_bar
-save_fig(p_2g_bar, "fig_2h", "section2")  # composition panel = Fig 2h
+save_fig(p_2g_bar, "fig_2h", "section2", pdf = TRUE, svg = FALSE, width = 3.0, height = 2.4)  # composition panel = Fig 2h
 ```
 
 ```{r fig_2i}
@@ -792,13 +860,13 @@ cmp_te_types <- combn(levels(factor(df_plot$repeat_type_name)), 2, simplify = FA
 p_2i <- ggplot(df_plot, aes(x = repeat_type_name, y = disorder, fill = repeat_type_name)) +
   geom_boxplot(outlier.size = 0.5) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
-  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE, size = 2) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8), legend.position = "none") +
   labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "")
 p_2i
-save_fig(p_2i, "fig_2i", "section2")
+save_fig(p_2i, "fig_2i", "section2", pdf = TRUE, svg = FALSE, width = 3.0, height = 3.0)
 
 df_plot <- df_plot %>% ungroup()
 stat_2i <- df_plot %>%
@@ -824,13 +892,13 @@ cmp_te_types <- combn(levels(factor(df_plot$repeat_type_name)), 2, simplify = FA
 p_edf3b <- ggplot(df_plot, aes(x = repeat_type_name, y = disorder.25, fill = repeat_type_name)) +
   geom_boxplot(outlier.size = 0.5) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
-  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE, size = 2) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8), legend.position = "none") +
   labs(x = NULL, y = "Disorder (AF - RSA)", title = "")
 p_edf3b
-save_fig(p_edf3b, "edf_3b", "section2")
+save_fig(p_edf3b, "edf_3b", "section2", pdf = TRUE, svg = FALSE, width = 3.0, height = 3.0)
 
 df_plot <- df_plot %>% ungroup()
 stat_ED3b <- df_plot %>%
@@ -856,13 +924,13 @@ cmp_te_types <- combn(levels(factor(df_plot$repeat_type_name)), 2, simplify = FA
 p_edf3c <- ggplot(df_plot, aes(x = repeat_type_name, y = punch, fill = repeat_type_name)) +
   geom_boxplot(outlier.size = 0.5) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
-  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE, size = 2) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8), legend.position = "none") +
   labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
 p_edf3c
-save_fig(p_edf3c, "edf_3c", "section2")
+save_fig(p_edf3c, "edf_3c", "section2", pdf = TRUE, svg = FALSE, width = 3.0, height = 3.0)
 
 df_plot <- df_plot %>% ungroup()
 stat_ED3c <- df_plot %>%
@@ -896,13 +964,13 @@ p_edf3d <- ggplot(df_plot_sva %>% filter(uniprot_id %in% sva_non_redundant_ids$u
                   aes(x = name, y = disorder, fill = name)) +
   geom_boxplot(outlier.size = 0.5) +
   scale_fill_manual(values = c("SVA_A" = "#1F5C5C", "SVA_C" = "#2A7A7A", "SVA_D" = "#3D9E9E", "SVA_E" = "#52AAAA")) +
-  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE, size = 2) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8), legend.position = "none") +
   labs(x = NULL, y = "Disorder (1 - pLDDT)", title = "")
 p_edf3d
-save_fig(p_edf3d, "edf_3d", "section2")
+save_fig(p_edf3d, "edf_3d", "section2", pdf = TRUE, svg = FALSE, width = 3.0, height = 3.0)
 
 df_plot_sva_f <- df_plot_sva %>% filter(uniprot_id %in% sva_non_redundant_ids$uniprot_id) %>% ungroup()
 stat_ED3d <- df_plot_sva_f %>%
@@ -929,14 +997,14 @@ df_rep_pct3 <- df_rep3 %>% mutate(name = factor(name, levels = rep_levels3), pct
 
 p_edf5a <- ggplot(df_rep_pct3, aes(x = pct, y = name, fill = name)) +
   geom_col(width = 0.7) +
-  geom_text(aes(label = paste0(round(pct, 2), "%")), hjust = -0.2, size = 4) +
+  geom_text(aes(label = paste0(round(pct, 2), "%")), hjust = -0.2, size = 2.5) +
   labs(x = "Percentage", y = NULL, title = "") +
   theme_classic() +
   coord_cartesian(xlim = c(NA, 62)) +
-  theme(axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 9),
-        axis.text.y = element_text(size = 12), legend.position = "none")
+  theme(axis.title.x = element_text(size = 8), axis.text.x = element_text(size = 7),
+        axis.text.y = element_text(size = 7), legend.position = "none")
 p_edf5a
-save_fig(p_edf5a, "edf_5a", "section2")
+save_fig(p_edf5a, "edf_5a", "section2", pdf = TRUE, svg = FALSE, width = 3.4, height = 3.4)
 ```
 
 ```{r edf_5d}
@@ -951,12 +1019,12 @@ p_edf5d <- ggplot(len_df_primates, aes(x = n, fill = repeat_type_name)) +
   facet_wrap(~ repeat_type_name, ncol = 2) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 11), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.text = element_text(size = 16), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = "Length", y = "Density", title = "")
 p_edf5d
-save_fig(p_edf5d, "edf_5d", "section2")
+save_fig(p_edf5d, "edf_5d", "section2", pdf = TRUE, svg = FALSE, width = 4.8, height = 4.0)
 
 mm_ED5d_len <- len_df_primates %>% group_by(repeat_type_name) %>%
   summarise(mean = mean(n), median = median(n), n = n(), .groups = "drop") %>%
@@ -996,13 +1064,14 @@ df_cors <- dfam_disorder_punch %>%
   dplyr::select(uniprot_id, mean_disorder, repeat_type_name, name, GC_percent)
 
 df_te_disorer_gc <- left_join(
-  dfam_disorder_primates_te_type_punch %>% dplyr::select(-tr),
+  dfam_disorder_primates_te_type_punch %>% dplyr::select(-X, -X1_plddt, -af_rsa, -Ensembl, -tr),
   df_cors %>% dplyr::select(-mean_disorder),
   by = c("uniprot_id", "name", "repeat_type_name")) %>%
   mutate(source = "Primate") %>% rename(gc_content = GC_percent)
 
 df_sims_te_disorder_gc <- rbind(df_sims_disorer_gc, df_te_disorer_gc)
 ```
+
 
 ```{r fig_3b}
 #### Fig 3b — GC by TE class (Primate CDS) ####
@@ -1011,13 +1080,13 @@ cmp_te_types <- combn(unique(df_cors$repeat_type_name), 2, simplify = FALSE)
 p_3b <- ggplot(df_cors, aes(x = repeat_type_name, y = GC_percent, fill = repeat_type_name)) +
   geom_boxplot(outlier.shape = NA) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
-  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE) +
+  stat_compare_means(comparisons = cmp_te_types, method = "wilcox.test", label = "p.signif", hide.ns = TRUE, size = 2) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8), legend.position = "none") +
   labs(x = NULL, y = "GC %", title = "")
 p_3b
-save_fig(p_3b, "fig_3b", "section3")
+save_fig(p_3b, "fig_3b", "section3", pdf = TRUE, svg = FALSE, width = 3.0, height = 3.0)
 
 df_cors <- df_cors %>% ungroup()
 stat_3b <- df_cors %>%
@@ -1051,14 +1120,14 @@ p_3c <- df_3c %>%
                                "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
   stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
-                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01) +
+                     label = "p.signif", hide.ns = TRUE, size = 2, tip.length = 0.01) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = NULL, y = "GC %", title = "")
 p_3c
-save_fig(p_3c, "fig_3c", "section3")
+save_fig(p_3c, "fig_3c", "section3", pdf = TRUE, svg = FALSE, width = 4.8, height = 4.2)
 
 stat_3c <- df_3c %>%
   group_by(repeat_type_name) %>% wilcox_test(gc_content ~ source) %>% ungroup() %>%
@@ -1089,16 +1158,16 @@ p_3d <- df_3d %>%
   geom_hline(yintercept = 0.35, linetype = "dotted", color = "grey40", linewidth = 0.7) +
   scale_y_continuous(expand = expansion(mult = c(0.1, 0.1))) +
   stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
-                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+                     label = "p.signif", hide.ns = TRUE, size = 2, tip.length = 0.01, vjust = 0.5) +
   scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
                                "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
 p_3d
-save_fig(p_3d, "fig_3d", "section3")
+save_fig(p_3d, "fig_3d", "section3", pdf = TRUE, svg = FALSE, width = 4.8, height = 4.2)
 
 stat_3d <- df_3d %>%
   group_by(repeat_type_name) %>% wilcox_test(punch ~ source) %>% ungroup() %>%
@@ -1133,16 +1202,16 @@ p_3e <- df_3e %>%
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
   geom_hline(yintercept = 60, linetype = "dotted", color = "grey40", linewidth = 0.7) +
   stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
-                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+                     label = "p.signif", hide.ns = TRUE, size = 2, tip.length = 0.01, vjust = 0.5) +
   scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
                                "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = NULL, y = "GC %", title = "")
 p_3e
-save_fig(p_3e, "fig_3e", "section3")
+save_fig(p_3e, "fig_3e", "section3", pdf = TRUE, svg = FALSE, width = 5.4, height = 2.6)
 
 stat_3e <- df_3e %>%
   group_by(name) %>% wilcox_test(gc_content ~ source) %>% ungroup() %>%
@@ -1179,16 +1248,16 @@ p_3g <- df_3g %>%
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
   geom_hline(yintercept = 60, linetype = "dotted", color = "grey40", linewidth = 0.7) +
   stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
-                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+                     label = "p.signif", hide.ns = TRUE, size = 2, tip.length = 0.01, vjust = 0.5) +
   scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
                                "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = NULL, y = "GC %", title = "")
 p_3g
-save_fig(p_3g, "fig_3g", "section3")
+save_fig(p_3g, "fig_3g", "section3", pdf = TRUE, svg = FALSE, width = 3.4, height = 2.6)
 
 stat_3g <- df_3g %>%
   group_by(name) %>% wilcox_test(gc_content ~ source) %>% ungroup() %>%
@@ -1221,16 +1290,16 @@ p_3f <- df_3f %>%
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
   geom_hline(yintercept = 0.35, linetype = "dotted", color = "grey40", linewidth = 0.7) +
   stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
-                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+                     label = "p.signif", hide.ns = TRUE, size = 2, tip.length = 0.01, vjust = 0.5) +
   scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
                                "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
 p_3f
-save_fig(p_3f, "fig_3f", "section3")
+save_fig(p_3f, "fig_3f", "section3", pdf = TRUE, svg = FALSE, width = 5.4, height = 2.6)
 
 stat_3f <- df_3f %>%
   group_by(name) %>% wilcox_test(punch ~ source) %>% ungroup() %>%
@@ -1265,16 +1334,16 @@ p_3h <- df_3h %>%
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
   geom_hline(yintercept = 0.35, linetype = "dotted", color = "grey40", linewidth = 0.7) +
   stat_compare_means(comparisons = list(c("Genomic", "Primate")), method = "wilcox.test",
-                     label = "p.signif", hide.ns = TRUE, size = 4, tip.length = 0.01, vjust = 0.5) +
+                     label = "p.signif", hide.ns = TRUE, size = 2, tip.length = 0.01, vjust = 0.5) +
   scale_fill_manual(values = c("Genomic" = no_te_color, "DNA" = "#B4747C", "LINE" = "#BC7443",
                                "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none") +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8),
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none") +
   labs(x = NULL, y = "Disorder (PUNCH 2-light)", title = "")
 p_3h
-save_fig(p_3h, "fig_3h", "section3")
+save_fig(p_3h, "fig_3h", "section3", pdf = TRUE, svg = FALSE, width = 3.4, height = 2.6)
 
 stat_3h <- df_3h %>%
   group_by(name) %>% wilcox_test(punch ~ source) %>% ungroup() %>%
@@ -1321,14 +1390,14 @@ p_4a <- df_total_rmblast %>%
   theme_classic() +
   scale_fill_manual(values = c("Genome" = no_te_color, "CDS" = te_general_color)) +
   labs(title = "", x = "Kimura Divergence (CpG adjusted)", y = "Density", fill = "") +
-  theme(legend.position = "top", panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+  theme(legend.position = "top", panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.title = element_text(size = 8), axis.text = element_text(size = 7), legend.text = element_text(size = 6))
 p_4a
-save_fig(p_4a, "fig_4a", "section4", svg = FALSE)  # heavy
+save_fig(p_4a, "fig_4a", "section4", svg = FALSE, width = 3.0, height = 2.4)  # heavy
 ```
 
 ```{r fig_4b}
 #### Fig 4b — per-class Kimura divergence ####
-# Heavy density panel: PNG only.
 groups <- c("DNA_Transposons", "SVA", "LINE-1", "Alu")
 labels_k <- c(DNA_Transposons = "DNA", SVA = "Retroposon", `LINE-1` = "LINE", Alu = "SINE")
 
@@ -1339,18 +1408,20 @@ df_facet <- df_total_rmblast %>%
                              levels = c("Non coding", "SINE", "LINE", "DNA", "Retroposon")))
 
 p_4b <- ggplot(df_facet, aes(x = kimura_divergence, fill = fill_class, weight = alig_len)) +
-  geom_density(color = "black", adjust = 1.2) +
+  geom_density(aes(alpha = fill_class), color = "black", adjust = 1.2) + 
   geom_rug(data = df_facet %>% filter(source_2 == "CDS"),
            aes(x = kimura_divergence), color = "#3D6446", sides = "b", alpha = 0.8, inherit.aes = FALSE) +
   facet_wrap(~ panel, scales = "free_y") +
   scale_fill_manual(values = c("Non coding" = no_te_color, "SINE" = "#3D6446", "LINE" = "#BC7443",
                                "DNA" = "#B4747C", "Retroposon" = "#2A7A7A")) +
+  scale_alpha_manual(values = c("Non coding" = 0.4, "SINE" = 0.4, "LINE" = 0.4, "DNA" = 0.4, "Retroposon" = 0.4)) +
   theme_classic() +
   labs(x = "Kimura Divergence (CpG adjusted)", y = "Density", fill = "") +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        strip.background = element_blank(), strip.text = element_text(size = 12), legend.position = "none")
+        strip.background = element_blank(), strip.text = element_text(size = 7), legend.position = "none",
+        axis.title = element_text(size = 8), axis.text = element_text(size = 7))
 p_4b
-save_fig(p_4b, "fig_4b", "section4", svg = FALSE)  # heavy
+save_fig(p_4b, "fig_4b", "section4", svg = FALSE, width = 4.8, height = 4.2)
 ```
 
 ```{r zscore-join}
@@ -1377,11 +1448,11 @@ p_4c <- disorder_zscore_primates %>%
   annotate("rect", xmin = -Inf, xmax = -2, ymin = -Inf, ymax = Inf, fill = "#44749A", alpha = 0.08) +
   annotate("rect", xmin = 2, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "#44749A", alpha = 0.08) +
   theme_classic() +
-  theme(axis.text.x = element_text(size = 11), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20)) +
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8)) +
   labs(x = "Robust Z-score Kimura CpG", y = "Density", title = "")
 p_4c
-save_fig(p_4c, "fig_4c", "section4", svg = FALSE)  # heavy
+save_fig(p_4c, "fig_4c", "section4", svg = FALSE, width = 3.0, height = 2.4)  # heavy
 ```
 
 ```{r fig_4d}
@@ -1394,16 +1465,16 @@ df_zscore_sine <- disorder_zscore_primates %>%
 
 p_4d <- ggplot(df_zscore_sine, aes(x = zscore_group, y = disorder, fill = zscore_group)) +
   geom_boxplot(outlier.shape = NA) +
-  stat_compare_means(method = "wilcox.test", label = "p.signif",
+  stat_compare_means(method = "wilcox.test", label = "p.signif", size = 2.5,
                      comparisons = list(c("\u2264 -2, young", "\u2265 2, old"))) +
   scale_fill_manual(values = c("\u2265 2, old" = "#2A4F35", "\u2264 -2, young" = "#6AAF7C")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   theme_classic() +
   labs(x = NULL, y = "Disorder (1 - pLDDT)") +
-  theme(axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), legend.position = "none")
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), legend.position = "none")
 p_4d
-save_fig(p_4d, "fig_4d", "section4")
+save_fig(p_4d, "fig_4d", "section4", pdf = TRUE, svg = FALSE, width = 2.4, height = 2.4)
 
 df_zscore_sine <- df_zscore_sine %>% ungroup()
 stat_4d <- df_zscore_sine %>%
@@ -1427,17 +1498,17 @@ mm_4d
 p_edf5a_z <- ggplot(df_zscore_sine, aes(x = zscore_group, y = disorder, fill = zscore_group)) +
   geom_boxplot(outlier.shape = NA) +
   facet_wrap(~name) +
-  stat_compare_means(method = "wilcox.test", label = "p.signif",
+  stat_compare_means(method = "wilcox.test", label = "p.signif", size = 2,
                      comparisons = list(c("\u2264 -2, young", "\u2265 2, old"))) +
   scale_fill_manual(values = c("\u2265 2, old" = "#2A4F35", "\u2264 -2, young" = "#6AAF7C")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   theme_classic() +
   labs(x = NULL, y = "Disorder (1 - pLDDT)") +
-  theme(axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), strip.text = element_text(size = 12),
+  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), strip.text = element_text(size = 7),
         strip.background = element_blank(), legend.position = "none")
 p_edf5a_z
-save_fig(p_edf5a_z, "edf_5a_zscore", "section4")
+save_fig(p_edf5a_z, "edf_5a_zscore", "section4", pdf = TRUE, svg = FALSE, width = 5.4, height = 2.6)
 
 stat_ED5a <- df_zscore_sine %>%
   group_by(name) %>% wilcox_test(disorder ~ zscore_group) %>% ungroup() %>%
@@ -1484,15 +1555,16 @@ plot_df_4e <- cluster_monkies_primate %>%
 
 p_4e <- ggplot(plot_df_4e, aes(x = species_cluster, y = n, fill = repeat_type_name)) +
   geom_col(position = position_dodge(width = 0.9, preserve = "single")) +
-  geom_text(aes(label = n), position = position_dodge(width = 0.9, preserve = "single"), vjust = -0.4, size = 6) +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9, preserve = "single"), vjust = -0.4, size = 2.5) +
   scale_fill_manual(values = c("DNA" = "#B4747C", "LINE" = "#BC7443", "Retroposon" = "#2A7A7A", "SINE" = "#3D6446")) +
   labs(x = "Last species cluster with TE", y = "Number of TE insertions", fill = "Repeat Type") +
   theme_classic() +
   coord_cartesian(ylim = c(NA, 31)) +
-  theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 11), axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 20), strip.text = element_text(size = 16))
+  theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 7), axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8), strip.text = element_text(size = 7),
+        legend.text = element_text(size = 6), legend.title = element_text(size = 7))
 p_4e
-save_fig(p_4e, "fig_4e", "section4")
+save_fig(p_4e, "fig_4e", "section4", pdf = TRUE, svg = FALSE, width = 4.6, height = 3.0)
 ```
 
 ```{r fig_4f}
@@ -1517,16 +1589,16 @@ p_4f <- ggplot(cluster_monkies_primate,
                aes(x = factor(species_cluster), y = tr_pLDDT, fill = factor(species_cluster))) +
   ggdist::stat_halfeye(side = "left", adjust = 0.8, width = 0.6, justification = 1.1, slab_alpha = 0.9) +
   ggdist::stat_dots(side = "right", justification = -0.15, alpha = 0.5, size = 0.2, width = 0.4, quantiles = 1000) +
-  scale_x_discrete(labels = x_lab_vec) +
+  #scale_x_discrete(labels = x_lab_vec) +
   scale_fill_manual(values = pal_purple) +
   labs(x = "Last species cluster with TE", y = "Human TE disorder (1 - pLDDT)") +
   stat_compare_means(comparisons = cmp_mk_lm, method = "wilcox.test", label = "p.signif",
-                     hide.ns = FALSE, p.adjust.method = "BH", method.args = list(exact = FALSE)) +
+                     hide.ns = FALSE, p.adjust.method = "BH", size = 2, method.args = list(exact = FALSE)) +
   theme_classic() +
-  theme(legend.position = "none", axis.title.x = element_text(size = 20),
-        axis.title.y = element_text(size = 20), axis.text.x = element_text(size = 10))
+  theme(legend.position = "none", axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 8), axis.text.x = element_text(size = 7))
 p_4f
-save_fig(p_4f, "fig_4f", "section4", svg = FALSE)  # heavy
+save_fig(p_4f, "fig_4f", "section4", svg = FALSE, width = 3.6, height = 3.2)  # heavy
 
 cmp_dat <- cluster_monkies_primate %>% mutate(species_cluster = droplevels(factor(species_cluster))) %>% ungroup()
 stat_4f <- cmp_dat %>%
@@ -1563,7 +1635,7 @@ stats_all <- bind_rows(
   dplyr::select(-magnitude)
 
 stats_all
-write_csv(stats_all, "../suppl_tables/supplementary_table_13.csv")
+write_csv(stats_all, "../data/supplementary_table_13.csv")
 ```
 
 ```{r supplementary-table-14-means-medians}
@@ -1578,5 +1650,5 @@ means_medians_all <- bind_rows(
   relocate(figure_panel, group, predictor, mean, median, n)
 
 means_medians_all
-write_csv(means_medians_all, "../suppl_tables/supplementary_table_14.csv")
+write_csv(means_medians_all, "../data/supplementary_table_14.csv")
 ```
