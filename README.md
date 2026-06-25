@@ -21,20 +21,16 @@ Intrinsically disordered regions (IDRs) are central contributors to protein func
 ```
 Mac_Donagh_TE_2026/
 ├── main/
-│   ├── figures/
-│   │   ├── figure1.pdf
-│   │   ├── figure2.pdf
-│   │   ├── figure3.pdf
-│   │   ├── figure4.pdf
-│   │   └── figure5.pdf
-│   └── extended_data/
-│       ├── extended_data_fig1.pdf
-│       ├── extended_data_fig2.pdf
-│       ├── extended_data_fig3.pdf
-│       ├── extended_data_fig4.pdf
-│       ├── extended_data_fig5.pdf
-│       ├── extended_data_fig6.pdf
-│       └── extended_data_fig7.pdf
+│   ├── plots/
+│   │   ├── section1/
+|   |   |   ├── fig1a.pdf
+|   |   |   ├── fig1b.pdf
+|   |   |   └── ... 
+│   │   ├── section2
+│   │   ├── section3
+│   │   ├── section4
+│   │   ├── section5
+|   |   └── figures
 ├── scripts/
 │   └── (R scripts for all analyses and figure generation)
 ├── data/
